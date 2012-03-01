@@ -45,6 +45,7 @@ import org.neo4j.helpers.Pair;
 import org.neo4j.helpers.Triplet;
 import org.neo4j.helpers.collection.IterableWrapper;
 import org.neo4j.helpers.collection.PrefetchingIterator;
+import org.neo4j.kernel.Lifecycle;
 import org.neo4j.kernel.PropertyTracker;
 import org.neo4j.kernel.impl.cache.AdaptiveCacheManager;
 import org.neo4j.kernel.impl.cache.Cache;
@@ -70,12 +71,26 @@ import org.neo4j.kernel.impl.util.DirectionWrapper;
 import org.neo4j.kernel.impl.util.RelIdArray;
 import org.neo4j.kernel.impl.util.RelIdArrayWithLoops;
 
-public class NodeManager implements RelationshipGroupTranslator
+public class NodeManager implements RelationshipGroupTranslator,Lifecycle
 {
+    public interface Configuration
+    {
+        boolean use_adaptive_cache(boolean def);
+        float adaptive_cache_heap_ratio(float def, float min, float max);
+        int min_node_cache_size(int def);
+
+        int min_relationship_cache_size(int def);
+
+        int max_node_cache_size(int def);
+
+        int max_relationship_cache_size(int def);
+    }
+    
     private static Logger log = Logger.getLogger( NodeManager.class.getName() );
 
     private long referenceNodeId = 0;
 
+    private Configuration config;
     private final GraphDatabaseService graphDbService;
     private final Cache<Long,NodeImpl> nodeCache;
     private final Cache<Long,RelationshipImpl> relCache;
@@ -89,40 +104,40 @@ public class NodeManager implements RelationshipGroupTranslator
     private final PersistenceManager persistenceManager;
     private final EntityIdGenerator idGenerator;
 
+    private final NodeProxy.NodeLookup nodeLookup;
+    private final RelationshipProxy.RelationshipLookups relationshipLookups;
+
     private final List<PropertyTracker<Node>> nodePropertyTrackers;
     private final List<PropertyTracker<Relationship>> relationshipPropertyTrackers;
 
-    private boolean useAdaptiveCache = false;
-    private float adaptiveCacheHeapRatio = 0.77f;
-    private int minNodeCacheSize = 0;
-    private int minRelCacheSize = 0;
-    private int maxNodeCacheSize = 1500;
-    private int maxRelCacheSize = 3500;
+    private boolean useAdaptiveCache;
+
+    private static final int INDEX_COUNT = 2500;
 
     private static final int LOCK_STRIPE_COUNT = 32;
     private final ReentrantLock loadLocks[] =
         new ReentrantLock[LOCK_STRIPE_COUNT];
     private GraphProperties graphProperties;
 
-    NodeManager( GraphDatabaseService graphDb,
+    public NodeManager( Configuration config, GraphDatabaseService graphDb,
             AdaptiveCacheManager cacheManager, LockManager lockManager,
             LockReleaser lockReleaser, TransactionManager transactionManager,
             PersistenceManager persistenceManager, EntityIdGenerator idGenerator,
-            RelationshipTypeCreator relTypeCreator, CacheType cacheType )
+            RelationshipTypeHolder relationshipTypeHolder, CacheType cacheType, PropertyIndexManager propertyIndexManager,
+            NodeProxy.NodeLookup nodeLookup, RelationshipProxy.RelationshipLookups relationshipLookups)
     {
+        this.config = config;
         this.graphDbService = graphDb;
         this.cacheManager = cacheManager;
         this.lockManager = lockManager;
         this.transactionManager = transactionManager;
-        this.propertyIndexManager = new PropertyIndexManager(
-            transactionManager, persistenceManager, idGenerator );
+        this.propertyIndexManager = propertyIndexManager;
         this.lockReleaser = lockReleaser;
-        lockReleaser.setNodeManager( this );
-        lockReleaser.setPropertyIndexManager( propertyIndexManager );
         this.persistenceManager = persistenceManager;
         this.idGenerator = idGenerator;
-        this.relTypeHolder = new RelationshipTypeHolder( transactionManager,
-            persistenceManager, idGenerator, relTypeCreator );
+        this.nodeLookup = nodeLookup;
+        this.relationshipLookups = relationshipLookups;
+        this.relTypeHolder = relationshipTypeHolder;
 
         this.cacheType = cacheType;
         this.nodeCache = cacheType.node( cacheManager );
@@ -146,127 +161,68 @@ public class NodeManager implements RelationshipGroupTranslator
         return this.cacheType;
     }
 
-    private void parseParams( Map<Object,Object> params )
+    @Override
+    public void init()
     {
-        if ( params.containsKey( "use_adaptive_cache" ) )
-        {
-            String value = (String) params.get( "use_adaptive_cache" );
-            if ( value.toLowerCase().equals( "yes" ) )
-            {
-                useAdaptiveCache = true;
-            }
-            else if ( value.toLowerCase().equals( "no" ) )
-            {
-                useAdaptiveCache = false;
-            }
-            else
-            {
-                log.warning( "Unable to parse use_adaptive_cache=" + value );
-            }
-        }
-        if ( params.containsKey( "adaptive_cache_heap_ratio" ) )
-        {
-            Object value = params.get( "adaptive_cache_heap_ratio" );
-            try
-            {
-                adaptiveCacheHeapRatio = Float.parseFloat( (String) value );
-            }
-            catch ( NumberFormatException e )
-            {
-                log.warning( "Unable to parse adaptive_cache_heap_ratio "
-                    + value );
-            }
-            if ( adaptiveCacheHeapRatio < 0.1f )
-            {
-                adaptiveCacheHeapRatio = 0.1f;
-            }
-            if ( adaptiveCacheHeapRatio > 0.95f )
-            {
-                adaptiveCacheHeapRatio = 0.95f;
-            }
-        }
-        if ( params.containsKey( "min_node_cache_size" ) )
-        {
-            Object value = params.get( "min_node_cache_size" );
-            try
-            {
-                minNodeCacheSize = Integer.parseInt( (String) value );
-            }
-            catch ( NumberFormatException e )
-            {
-                log.warning( "Unable to parse min_node_cache_size " + value );
-            }
-        }
-        if ( params.containsKey( "min_relationship_cache_size" ) )
-        {
-            Object value = params.get( "min_relationship_cache_size" );
-            try
-            {
-                minRelCacheSize = Integer.parseInt( (String) value );
-            }
-            catch ( NumberFormatException e )
-            {
-                log.warning( "Unable to parse min_relationship_cache_size "
-                    + value );
-            }
-        }
-        if ( params.containsKey( "max_node_cache_size" ) )
-        {
-            Object value = params.get( "max_node_cache_size" );
-            try
-            {
-                maxNodeCacheSize = Integer.parseInt( (String) value );
-            }
-            catch ( NumberFormatException e )
-            {
-                log.warning( "Unable to parse max_node_cache_size " + value );
-            }
-        }
-        if ( params.containsKey( "max_relationship_cache_size" ) )
-        {
-            Object value = params.get( "max_relationship_cache_size" );
-            try
-            {
-                maxRelCacheSize = Integer.parseInt( (String) value );
-            }
-            catch ( NumberFormatException e )
-            {
-                log.warning( "Unable to parse max_relationship_cache_size "
-                    + value );
-            }
-        }
     }
 
-    public void start( Map<Object,Object> params )
+    @Override
+    public void start( )
     {
-        parseParams( params );
+        // load and verify from PS
+        NameData[] relTypes = null;
+        NameData[] propertyIndexes = null;
+        // beginTx();
+        relTypes = persistenceManager.loadAllRelationshipTypes();
+        propertyIndexes = persistenceManager.loadPropertyIndexes( INDEX_COUNT );
+        // commitTx();
+        addRawRelationshipTypes( relTypes );
+        addPropertyIndexes( propertyIndexes );
+        if ( propertyIndexes.length < INDEX_COUNT )
+        {
+            setHasAllpropertyIndexes( true );
+        }
+
+        useAdaptiveCache = config.use_adaptive_cache(false);
+        float adaptiveCacheHeapRatio = config.adaptive_cache_heap_ratio( 0.77f, 0.1f, 0.95f );
+        int minNodeCacheSize = config.min_node_cache_size( 0 );
+        int minRelCacheSize = config.min_relationship_cache_size( 0 );
+        int maxNodeCacheSize = config.max_node_cache_size( 1500 );
+        int maxRelCacheSize = config.max_relationship_cache_size( 3500 );
+
         nodeCache.resize( maxNodeCacheSize );
         relCache.resize( maxRelCacheSize );
         if ( useAdaptiveCache && cacheType.needsCacheManagerRegistration )
         {
             cacheManager.registerCache( nodeCache, adaptiveCacheHeapRatio,
-                minNodeCacheSize );
+                                        minNodeCacheSize );
             cacheManager.registerCache( relCache, adaptiveCacheHeapRatio,
-                minRelCacheSize );
-            cacheManager.start( params );
+                                        minRelCacheSize );
         }
     }
 
+    @Override
     public void stop()
     {
+        clearCache();
+
         if ( useAdaptiveCache && cacheType.needsCacheManagerRegistration )
         {
-            cacheManager.stop();
             cacheManager.unregisterCache( nodeCache );
             cacheManager.unregisterCache( relCache );
         }
+    }
+
+    @Override
+    public void shutdown()
+    {
     }
 
     public Node createNode()
     {
         long id = idGenerator.nextId( Node.class );
         NodeImpl node = new NodeImpl( id, Record.NO_NEXT_RELATIONSHIP.intValue(), Record.NO_NEXT_PROPERTY.intValue(), true );
-        NodeProxy proxy = new NodeProxy( id, this );
+        NodeProxy proxy = new NodeProxy( id, nodeLookup );
         acquireLock( proxy, LockType.WRITE );
         boolean success = false;
         try
@@ -284,6 +240,11 @@ public class NodeManager implements RelationshipGroupTranslator
                 setRollbackOnly();
             }
         }
+    }
+
+    public NodeProxy newNodeProxyById( long id )
+    {
+        return new NodeProxy( id, nodeLookup );
     }
 
     public Relationship createRelationship( Node startNodeProxy, NodeImpl startNode, Node endNode,
@@ -313,7 +274,7 @@ public class NodeManager implements RelationshipGroupTranslator
         RelationshipImpl rel = newRelationshipImpl( id, startNodeId, endNodeId, type, typeId, true );
         boolean firstNodeTaken = false;
         boolean secondNodeTaken = false;
-        RelationshipProxy proxy = new RelationshipProxy( id, this );
+        RelationshipProxy proxy = new RelationshipProxy( id, relationshipLookups );
         acquireLock( proxy, LockType.WRITE );
         boolean success = false;
         try
@@ -389,7 +350,7 @@ public class NodeManager implements RelationshipGroupTranslator
 //        return rest <= 3 ?
 //                new LowRelationshipImpl( id, startNodeId, endNodeId, type, newRel ) :
 //                new HighRelationshipImpl( id, startNodeId, endNodeId, type, newRel );
-        return new LowRelationshipImpl( id, startNodeId, endNodeId, typeId, newRel );
+        return new RelationshipImpl( id, startNodeId, endNodeId, typeId, newRel );
     }
 
     private ReentrantLock lockId( long id )
@@ -407,10 +368,35 @@ public class NodeManager implements RelationshipGroupTranslator
 
     private Node getNodeByIdOrNull( long nodeId )
     {
+//<<<<<<< HEAD
         NodeImpl node = getLightNode( nodeId );
         return node != null ? (Node)node.asProxy( this ) : null;
+//=======
+//        NodeImpl node = nodeCache.get( nodeId );
+//        if ( node != null )
+//        {
+//            return new NodeProxy( nodeId, nodeLookup );
+//        }
+//        ReentrantLock loadLock = lockId( nodeId );
+//        try
+//        {
+//            if ( nodeCache.get( nodeId ) != null )
+//            {
+//                return new NodeProxy( nodeId, nodeLookup );
+//            }
+//            NodeRecord record = persistenceManager.loadLightNode( nodeId );
+//            if ( record == null ) return null;
+//            node = new NodeImpl( nodeId, record.getCommittedNextRel(), record.getCommittedNextProp() );
+//            nodeCache.put( nodeId, node );
+//            return new NodeProxy( nodeId, nodeLookup );
+//        }
+//        finally
+//        {
+//            loadLock.unlock();
+//        }
+//>>>>>>> master
     }
-
+    
     public Node getNodeById( long nodeId ) throws NotFoundException
     {
         Node node = getNodeByIdOrNull( nodeId );
@@ -421,13 +407,19 @@ public class NodeManager implements RelationshipGroupTranslator
         return node;
     }
 
+    public RelationshipProxy newRelationshipProxyById( long id )
+    {
+        return new RelationshipProxy( id, relationshipLookups);
+    }
+
+
     public Iterator<Node> getAllNodes()
     {
         final long highId = getHighestPossibleIdInUse( Node.class );
         return new PrefetchingIterator<Node>()
         {
             private long currentId;
-
+            
             @Override
             protected Node fetchNextOrNull()
             {
@@ -482,11 +474,12 @@ public class NodeManager implements RelationshipGroupTranslator
         }
    }
 
-    NodeImpl getNodeForProxy( NodeProxy proxy, LockType lock )
+    public NodeImpl getNodeForProxy( long nodeId, LockType lock )
     {
-        if ( lock != null ) acquireTxBoundLock( proxy, lock );
-        NodeImpl node = getLightNode( proxy.getId() );
-        if ( node == null ) throw new NotFoundException( proxy + " not found." );
+        if ( lock != null )
+            acquireTxBoundLock( new NodeProxy( nodeId, nodeLookup ), lock );
+        NodeImpl node = getLightNode( nodeId );
+        if ( node == null ) throw new NotFoundException( "Node[" + nodeId + "] not found." );
         return node;
     }
 
@@ -499,7 +492,7 @@ public class NodeManager implements RelationshipGroupTranslator
         return getNodeById( referenceNodeId );
     }
 
-    void setReferenceNodeId( long nodeId )
+    public void setReferenceNodeId( long nodeId )
     {
         this.referenceNodeId = nodeId;
     }
@@ -509,7 +502,7 @@ public class NodeManager implements RelationshipGroupTranslator
         RelationshipImpl relationship = relCache.get( relId );
         if ( relationship != null )
         {
-            return new RelationshipProxy( relId, this );
+            return new RelationshipProxy( relId, relationshipLookups );
         }
         ReentrantLock loadLock = lockId( relId );
         try
@@ -517,7 +510,7 @@ public class NodeManager implements RelationshipGroupTranslator
             relationship = relCache.get( relId );
             if ( relationship != null )
             {
-                return new RelationshipProxy( relId, this );
+                return new RelationshipProxy( relId, relationshipLookups );
             }
             RelationshipRecord data = persistenceManager.loadLightRelationship( relId );
             if ( data == null )
@@ -536,14 +529,14 @@ public class NodeManager implements RelationshipGroupTranslator
             final long endNodeId = data.getEndNode();
             relationship = newRelationshipImpl( relId, startNodeId, endNodeId, type, typeId, false );
             relCache.put( relId, relationship );
-            return new RelationshipProxy( relId, this );
+            return new RelationshipProxy( relId, relationshipLookups );
         }
         finally
         {
             loadLock.unlock();
         }
     }
-
+    
     public Relationship getRelationshipById( long id ) throws NotFoundException
     {
         Relationship relationship = getRelationshipByIdOrNull( id );
@@ -560,7 +553,7 @@ public class NodeManager implements RelationshipGroupTranslator
         return new PrefetchingIterator<Relationship>()
         {
             private long currentId;
-
+            
             @Override
             protected Relationship fetchNextOrNull()
             {
@@ -583,16 +576,16 @@ public class NodeManager implements RelationshipGroupTranslator
             }
         };
     }
-
+    
     RelationshipType getRelationshipTypeById( int id )
     {
         return relTypeHolder.getRelationshipType( id );
     }
 
-    RelationshipImpl getRelForProxy( RelationshipProxy proxy, LockType lock )
+    public RelationshipImpl getRelationshipForProxy( long relId, LockType lock )
     {
-        if ( lock != null ) acquireTxBoundLock( proxy, lock );
-        long relId = proxy.getId();
+        if ( lock != null )
+            acquireTxBoundLock( new RelationshipProxy( relId, relationshipLookups ), lock );
         RelationshipImpl relationship = relCache.get( relId );
         if ( relationship != null ) return relationship;
         ReentrantLock loadLock = lockId( relId );
@@ -606,7 +599,7 @@ public class NodeManager implements RelationshipGroupTranslator
             RelationshipRecord data = persistenceManager.loadLightRelationship( relId );
             if ( data == null )
             {
-                throw new NotFoundException( proxy + " not found." );
+                throw new NotFoundException( "Relationship[" + relId + "] not found." );
             }
             int typeId = data.getType();
             RelationshipType type = getRelationshipTypeById( typeId );
@@ -688,7 +681,7 @@ public class NodeManager implements RelationshipGroupTranslator
             }
             else
             {
-                type = relImpl.getType( this );
+                type = getRelationshipTypeById( relImpl.getTypeId());
             }
             RelIdArray relationshipSet = newRelationshipMap.get( type.name() );
             if ( relationshipSet == null )
@@ -704,7 +697,7 @@ public class NodeManager implements RelationshipGroupTranslator
     {
          relCache.putAll( map );
     }
-
+    
     ArrayMap<Integer, PropertyData> loadGraphProperties( boolean light )
     {
         return persistenceManager.graphLoadProperties( light );
@@ -787,7 +780,7 @@ public class NodeManager implements RelationshipGroupTranslator
     {
         lockType.acquire( resource.asProxy( this ), lockManager );
     }
-
+    
     void acquireLock( PropertyContainer resource, LockType lockType )
     {
         lockType.acquire( resource, lockManager );
@@ -909,11 +902,6 @@ public class NodeManager implements RelationshipGroupTranslator
         propertyIndexManager.setHasAll( hasAll );
     }
 
-    void clearPropertyIndexes()
-    {
-        propertyIndexManager.clear();
-    }
-
     PropertyIndex getIndexFor( int keyId )
     {
         return propertyIndexManager.getIndexFor( keyId );
@@ -1020,7 +1008,7 @@ public class NodeManager implements RelationshipGroupTranslator
     {
         persistenceManager.graphRemoveProperty( property );
     }
-
+    
     ArrayMap<Integer,PropertyData> deleteRelationship( RelationshipImpl rel )
     {
         deletePrimitive( rel );
@@ -1153,7 +1141,7 @@ public class NodeManager implements RelationshipGroupTranslator
     {
         return this.lockReleaser;
     }
-
+    
     LockManager getLockManager()
     {
         return this.lockManager;
@@ -1319,17 +1307,17 @@ public class NodeManager implements RelationshipGroupTranslator
     {
         relationshipPropertyTrackers.remove( relationshipPropertyTracker );
     }
-
+    
     PersistenceManager getPersistenceManager()
     {
         return persistenceManager;
     }
-
+    
     private GraphProperties instantiateGraphProperties()
     {
         return new GraphProperties( this );
     }
-
+    
     public GraphProperties getGraphProperties()
     {
         return graphProperties;

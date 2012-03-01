@@ -21,7 +21,6 @@ package org.neo4j.kernel.impl.nioneo.store;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 import org.neo4j.kernel.IdGeneratorFactory;
 import org.neo4j.kernel.IdType;
@@ -29,6 +28,12 @@ import org.neo4j.kernel.impl.util.StringLogger;
 
 public class RelationshipGroupStore extends AbstractStore implements Store, RecordStore<RelationshipGroupRecord>
 {
+    public interface Configuration
+        extends AbstractStore.Configuration
+    {
+    
+    }
+    
     /* Record layout
      * 
      * [next,type,firstOut,firstIn,firstLoop] = 20B
@@ -37,15 +42,16 @@ public class RelationshipGroupStore extends AbstractStore implements Store, Reco
     public static final String TYPE_DESCRIPTOR = "RelationshipGroupStore";
     public static final String FILE_NAME = ".relationshipgroupstore.db";
     
-    public RelationshipGroupStore( String fileName, Map<?, ?> config, IdType idType )
+    public RelationshipGroupStore( String fileName, Configuration config,
+            IdGeneratorFactory idGeneratorFactory, FileSystemAbstraction fileSystemAbstraction, StringLogger stringLogger )
     {
-        super( fileName, config, idType );
+        super( fileName, config, IdType.RELATIONSHIP_GROUP, idGeneratorFactory, fileSystemAbstraction, stringLogger );
     }
 
-    public static void createStore( String fileName, IdGeneratorFactory idGeneratorFactory, FileSystemAbstraction fileSystem )
-    {
-        createEmptyStore( fileName, buildTypeDescriptorAndVersion( TYPE_DESCRIPTOR ), idGeneratorFactory, fileSystem );
-    }
+//    public static void createStore( String fileName, IdGeneratorFactory idGeneratorFactory, FileSystemAbstraction fileSystem )
+//    {
+//        createEmptyStore( fileName, buildTypeDescriptorAndVersion( TYPE_DESCRIPTOR ), idGeneratorFactory, fileSystem );
+//    }
     
     @Override
     public RelationshipGroupRecord getRecord( long id )
@@ -224,12 +230,6 @@ public class RelationshipGroupStore extends AbstractStore implements Store, Reco
     public int getRecordHeaderSize()
     {
         return getRecordSize();
-    }
-
-    @Override
-    public void logIdUsage( StringLogger.LineLogger logger )
-    {
-        NeoStore.logIdUsage( logger, this );
     }
 
     @Override

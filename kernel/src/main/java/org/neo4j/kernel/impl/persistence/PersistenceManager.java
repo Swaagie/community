@@ -56,7 +56,7 @@ public class PersistenceManager
 
     private final PersistenceSource persistenceSource;
     private final TransactionManager transactionManager;
-    private final LockReleaser lockReleaser;
+    private LockReleaser lockReleaser;
 
     private final ArrayMap<Transaction,NeoStoreTransaction> txConnectionMap =
         new ArrayMap<Transaction,NeoStoreTransaction>( 5, true, true );
@@ -73,9 +73,9 @@ public class PersistenceManager
         this.lockReleaser = lockReleaser;
     }
 
-    public PersistenceSource getPersistenceSource()
+    public void setLockReleaser(LockReleaser lockReleaser)
     {
-        return persistenceSource;
+        this.lockReleaser = lockReleaser;
     }
 
     public NodeRecord loadLightNode( long id )
@@ -373,7 +373,7 @@ public class PersistenceManager
         {
             try
             {
-                tx.delistResource( con.getXAResource(), XAResource.TMSUCCESS );
+                con.delistResource(tx, XAResource.TMSUCCESS);
             }
             catch ( SystemException e )
             {

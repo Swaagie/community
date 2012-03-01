@@ -29,8 +29,9 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
+import javax.transaction.SystemException;
+import javax.transaction.Transaction;
 import javax.transaction.xa.XAException;
-import javax.transaction.xa.XAResource;
 
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
@@ -305,7 +306,7 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
         }
         try
         {
-            boolean freeIds = neoStore.getTxHook().freeIdsDuringRollback();
+            boolean freeIds = neoStore.freeIdsDuringRollback();
             if ( relTypeRecords != null ) for ( RelationshipTypeRecord record : relTypeRecords.values() )
             {
                 if ( record.isCreated() )
@@ -506,6 +507,13 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
         }
     }
 
+    @Override
+    public boolean delistResource( Transaction tx, int tmsuccess )
+        throws SystemException
+    {
+        return xaConnection.delistResource( tx, tmsuccess );
+    }
+
     private void updateFirstRelationships()
     {
         for ( NodeRecord record : nodeRecords.values() )
@@ -618,7 +626,7 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
             {
                 neoStore.setRecoveredStatus( false );
             }
-            neoStore.getIdGeneratorFactory().updateIdGenerators( neoStore );
+            neoStore.updateIdGenerators( );
         }
         finally
         {
@@ -1903,12 +1911,6 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
     {
         return ReadTransaction.getKeyIdForProperty( property,
                 getPropertyStore() );
-    }
-
-    @Override
-    public XAResource getXAResource()
-    {
-        return xaConnection.getXaResource();
     }
 
     @Override

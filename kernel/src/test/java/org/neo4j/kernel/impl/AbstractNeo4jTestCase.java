@@ -37,14 +37,11 @@ import org.junit.ClassRule;
 import org.junit.rules.TestRule;
 import org.junit.runner.Description;
 import org.junit.runners.model.Statement;
-import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Transaction;
-import org.neo4j.kernel.AbstractGraphDatabase;
 import org.neo4j.kernel.EmbeddedGraphDatabase;
 import org.neo4j.kernel.impl.core.NodeManager;
 import org.neo4j.kernel.impl.nioneo.store.AbstractDynamicStore;
 import org.neo4j.kernel.impl.nioneo.store.PropertyStore;
-import org.neo4j.kernel.impl.nioneo.xa.NeoStoreXaConnection;
 import org.neo4j.kernel.impl.transaction.XaDataSourceManager;
 import org.neo4j.kernel.impl.util.FileUtils;
 import org.neo4j.test.ImpermanentGraphDatabase;
@@ -73,12 +70,12 @@ public abstract class AbstractNeo4jTestCase
         }
     };
 
-    private static AbstractGraphDatabase graphDb;
+    private static EmbeddedGraphDatabase graphDb;
     private Transaction tx;
 
     private static boolean requiresPersistentGraphDatabase = false;
 
-    public GraphDatabaseService getGraphDb()
+    public EmbeddedGraphDatabase getGraphDb()
     {
         return graphDb;
     }
@@ -105,9 +102,9 @@ public abstract class AbstractNeo4jTestCase
         }
     }
 
-    public AbstractGraphDatabase getEmbeddedGraphDb()
+    public EmbeddedGraphDatabase getEmbeddedGraphDb()
     {
-        return (AbstractGraphDatabase) graphDb;
+        return graphDb;
     }
 
     protected boolean restartGraphDbBetweenTests()
@@ -200,7 +197,7 @@ public abstract class AbstractNeo4jTestCase
 
     public NodeManager getNodeManager()
     {
-        return ((AbstractGraphDatabase) graphDb).getConfig().getGraphDbModule().getNodeManager();
+        return graphDb.getNodeManager();
     }
 
     public static void deleteFileOrDirectory( String dir )
@@ -230,7 +227,7 @@ public abstract class AbstractNeo4jTestCase
 
     protected void clearCache()
     {
-        getEmbeddedGraphDb().getConfig().getGraphDbModule().getNodeManager().clearCache();
+        getEmbeddedGraphDb().getNodeManager().clearCache();
     }
 
     protected long propertyRecordsInUse()
@@ -264,8 +261,8 @@ public abstract class AbstractNeo4jTestCase
     
     protected PropertyStore propertyStore()
     {
-        XaDataSourceManager dsMgr = ((AbstractGraphDatabase)graphDb).getConfig().getTxModule().getXaDataSourceManager();
-        return ( (NeoStoreXaConnection) dsMgr.getXaDataSource( "nioneodb" ).getXaConnection() ).getPropertyStore();
+        XaDataSourceManager dsMgr = graphDb.getXaDataSourceManager();
+        return dsMgr.getNeoStoreDataSource().getXaConnection().getPropertyStore();
     }
 
     protected <T> Set<T> join( Set<T>... sets )
