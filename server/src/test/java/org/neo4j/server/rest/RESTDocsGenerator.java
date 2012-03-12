@@ -486,7 +486,7 @@ public class RESTDocsGenerator extends AsciiDocGenerator
         Writer fw = null;
         try
         {
-            fw = getFW("target" + File.separator + "docs"+ File.separator + section , data.title);
+            fw = AsciiDocGenerator.getFW("target" + File.separator + "docs"+ File.separator + section , data.title);
             String name = title.replace( " ", "-" )
                     .toLowerCase();
             String longSection = section.replaceAll( "\\(|\\)", "" )+"-" + name.replaceAll( "\\(|\\)", "" );
@@ -505,7 +505,8 @@ public class RESTDocsGenerator extends AsciiDocGenerator
                 line( fw, "" );
             }
             if( graph != null) {
-                fw.append( AsciidocHelper.createGraphViz( "Final Graph", graph, title));
+                fw.append( AsciidocHelper.createGraphVizWithNodeId(
+                        "Final Graph", graph, title ) );
                 line(fw, "" );
             }
             line( fw, "_Example request_" );

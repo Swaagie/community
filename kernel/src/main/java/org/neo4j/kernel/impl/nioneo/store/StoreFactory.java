@@ -20,6 +20,13 @@
 
 package org.neo4j.kernel.impl.nioneo.store;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 import org.neo4j.helpers.UTF8;
 import org.neo4j.kernel.ConfigProxy;
 import org.neo4j.kernel.IdGeneratorFactory;
@@ -34,14 +41,6 @@ import org.neo4j.kernel.impl.storemigration.monitoring.VisibleMigrationProgressM
 import org.neo4j.kernel.impl.transaction.TxHook;
 import org.neo4j.kernel.impl.util.StringLogger;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
-import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
 import static org.neo4j.kernel.Config.ARRAY_BLOCK_SIZE;
 import static org.neo4j.kernel.Config.STRING_BLOCK_SIZE;
 
@@ -52,12 +51,12 @@ public class StoreFactory
 {
     protected static final Logger logger = Logger.getLogger(StoreFactory.class.getName());
 
-    private Map<String, String> config;
-    private IdGeneratorFactory idGeneratorFactory;
-    private FileSystemAbstraction fileSystemAbstraction;
-    private LastCommittedTxIdSetter lastCommittedTxIdSetter;
-    private StringLogger stringLogger;
-    private TxHook txHook;
+    private final Map<String, String> config;
+    private final IdGeneratorFactory idGeneratorFactory;
+    private final FileSystemAbstraction fileSystemAbstraction;
+    private final LastCommittedTxIdSetter lastCommittedTxIdSetter;
+    private final StringLogger stringLogger;
+    private final TxHook txHook;
 
     public StoreFactory(Map<String, String> config, IdGeneratorFactory idGeneratorFactory, FileSystemAbstraction fileSystemAbstraction, LastCommittedTxIdSetter lastCommittedTxIdSetter, StringLogger stringLogger, TxHook txHook)
     {
@@ -81,7 +80,7 @@ public class StoreFactory
             return attemptNewNeoStore( fileName );
         }
     }
-    
+
     private NeoStore attemptNewNeoStore( String fileName )
     {
         return new NeoStore( fileName, ConfigProxy.config(config, NeoStore.Configuration.class),
@@ -150,7 +149,7 @@ public class StoreFactory
     {
         return createNeoStore( fileName, new StoreId() );
     }
-    
+
     public NeoStore createNeoStore(String fileName, StoreId storeId)
     {
         createEmptyStore( fileName, buildTypeDescriptorAndVersion( NeoStore.TYPE_DESCRIPTOR ) );
@@ -233,8 +232,8 @@ public class StoreFactory
         int arrayStoreBlockSize = PropertyStore.DEFAULT_DATA_BLOCK_SIZE;
         try
         {
-            String stringBlockSize = (String) config.get( STRING_BLOCK_SIZE );
-            String arrayBlockSize = (String) config.get( ARRAY_BLOCK_SIZE );
+            String stringBlockSize = config.get( STRING_BLOCK_SIZE );
+            String arrayBlockSize = config.get( ARRAY_BLOCK_SIZE );
             if ( stringBlockSize != null )
             {
                 int value = Integer.parseInt( stringBlockSize );
@@ -299,7 +298,7 @@ public class StoreFactory
     
     public void createRelationshipGroupStore( String fileName )
     {
-        createEmptyStore( fileName, RelationshipGroupStore.TYPE_DESCRIPTOR );
+        createEmptyStore( fileName, buildTypeDescriptorAndVersion( RelationshipGroupStore.TYPE_DESCRIPTOR ) );
     }
 
     /**
@@ -333,8 +332,7 @@ public class StoreFactory
         {
             throw new IllegalArgumentException( "Null filename" );
         }
-        File file = new File( fileName );
-        if ( file.exists() )
+        if ( fileSystemAbstraction.fileExists( fileName ) )
         {
             throw new IllegalStateException( "Can't create store[" + fileName
                     + "], file already exists" );
@@ -369,9 +367,9 @@ public class StoreFactory
             throw new UnderlyingStorageException( "Unable to create store "
                     + fileName, e );
         }
-        idGeneratorFactory.create(fileName + ".id");
+        idGeneratorFactory.create( fileSystemAbstraction, fileName + ".id" );
         // TODO highestIdInUse = 0 works now, but not when slave can create store files.
-        IdGenerator idGenerator = idGeneratorFactory.open(fileName + ".id", 1, idType, 0, false);
+        IdGenerator idGenerator = idGeneratorFactory.open(fileSystemAbstraction, fileName + ".id", 1, idType, 0, false);
         idGenerator.nextId(); // reserv first for blockSize
         idGenerator.close( false );
     }
@@ -383,8 +381,7 @@ public class StoreFactory
         {
             throw new IllegalArgumentException( "Null filename" );
         }
-        File file = new File( fileName );
-        if ( file.exists() )
+        if ( fileSystemAbstraction.fileExists( fileName ) )
         {
             throw new IllegalStateException( "Can't create store[" + fileName
                     + "], file already exists" );
@@ -406,7 +403,7 @@ public class StoreFactory
             throw new UnderlyingStorageException( "Unable to create store "
                     + fileName, e );
         }
-        idGeneratorFactory.create(fileName + ".id");
+        idGeneratorFactory.create( fileSystemAbstraction, fileName + ".id" );
     }
 
     public String buildTypeDescriptorAndVersion( String typeDescriptor )

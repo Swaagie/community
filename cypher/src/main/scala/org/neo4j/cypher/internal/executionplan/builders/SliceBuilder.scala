@@ -17,22 +17,23 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.neo4j.server.rest.domain;
+package org.neo4j.cypher.internal.executionplan.builders
 
-import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
+import org.neo4j.cypher.internal.executionplan.{PartiallySolvedQuery, PlanBuilder}
+import org.neo4j.cypher.internal.pipes.{SlicePipe, Pipe}
 
-import org.junit.Test;
-
-public class JsonHelperTest {
-    
-    @Test
-    public void shouldConvertNewlinesToWhitespace() {
-        final String MULTILINE_STRING = "Multilines\nunite";
-        final String EXPECTED_STRING = "\"Multilines unite\"";
-        String actualJSon = JsonHelper.createJsonFrom(MULTILINE_STRING);
-        assertThat(actualJSon, is(EXPECTED_STRING));
+class SliceBuilder extends PlanBuilder {
+  def apply(v1: (Pipe, PartiallySolvedQuery)): (Pipe, PartiallySolvedQuery) = v1 match {
+    case (p, q) => {
+      val slice = q.slice.map(_.token).head
+      val pipe = new SlicePipe(p, slice.from, slice.limit)
+      (pipe, q.copy(slice = q.slice.map(_.solve)))
     }
+  }
 
+  def isDefinedAt(x: (Pipe, PartiallySolvedQuery)): Boolean = x match {
+    case (p, q) => q.extracted && !q.sort.exists(_.unsolved) && q.slice.exists(_.unsolved)
+  }
 
+  def priority: Int = PlanBuilder.Slice
 }

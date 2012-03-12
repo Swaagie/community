@@ -37,6 +37,8 @@ public class RelationshipGroupStore extends AbstractStore implements Store, Reco
     /* Record layout
      * 
      * [next,type,firstOut,firstIn,firstLoop] = 20B
+     * 
+     * One record holds first relationship links to relationships for one type for one entity.
      */
     public static final int RECORD_SIZE = 20;
     public static final String TYPE_DESCRIPTOR = "RelationshipGroupStore";
@@ -48,11 +50,6 @@ public class RelationshipGroupStore extends AbstractStore implements Store, Reco
         super( fileName, config, IdType.RELATIONSHIP_GROUP, idGeneratorFactory, fileSystemAbstraction, stringLogger );
     }
 
-//    public static void createStore( String fileName, IdGeneratorFactory idGeneratorFactory, FileSystemAbstraction fileSystem )
-//    {
-//        createEmptyStore( fileName, buildTypeDescriptorAndVersion( TYPE_DESCRIPTOR ), idGeneratorFactory, fileSystem );
-//    }
-    
     @Override
     public RelationshipGroupRecord getRecord( long id )
     {

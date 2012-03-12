@@ -158,9 +158,15 @@ public class TestNeoStore extends AbstractNeo4jTestCase
                 "logical_log", file("nioneo_logical.log"));
         StoreFactory sf = new StoreFactory(config, CommonFactories.defaultIdGeneratorFactory(), CommonFactories.defaultFileSystemAbstraction(), null, StringLogger.DEV_NULL, null);
 
-        ds = new NeoStoreXaDataSource(ConfigProxy.config(config, NeoStoreXaDataSource.Configuration.class), sf, lockManager, lockReleaser, StringLogger.DEV_NULL,
-                new XaFactory(Collections.<String,String>emptyMap(), TxIdGenerator.DEFAULT, new PlaceboTm(),
-                        CommonFactories.defaultLogBufferFactory(), CommonFactories.defaultFileSystemAbstraction(), StringLogger.DEV_NULL, CommonFactories.defaultRecoveryVerifier() ), Collections.<Pair<TransactionInterceptorProvider,Object>>emptyList(), null );
+        ds = new NeoStoreXaDataSource(ConfigProxy.config(config, NeoStoreXaDataSource.Configuration.class),
+                                      CommonFactories.defaultFileSystemAbstraction(), sf, lockManager, lockReleaser,
+                                      StringLogger.DEV_NULL, new XaFactory( Collections.<String,String>emptyMap(),
+                                                                            TxIdGenerator.DEFAULT, new PlaceboTm(),
+                                                                            CommonFactories.defaultLogBufferFactory(),
+                                                                            CommonFactories.defaultFileSystemAbstraction(),
+                                                                            StringLogger.DEV_NULL,
+                                                                            CommonFactories.defaultRecoveryVerifier() ),
+                                      Collections.<Pair<TransactionInterceptorProvider,Object>>emptyList(), null );
 
         xaCon = ds.getXaConnection();
         pStore = xaCon.getPropertyStore();
@@ -1023,7 +1029,7 @@ public class TestNeoStore extends AbstractNeo4jTestCase
                 pStore.getArrayBlockSize() );
         ds.close();
     }
-    
+
     @Test
     public void setVersion() throws Exception
     {

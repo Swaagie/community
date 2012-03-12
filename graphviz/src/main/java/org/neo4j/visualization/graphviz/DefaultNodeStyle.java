@@ -26,7 +26,7 @@ import org.neo4j.visualization.PropertyType;
 
 class DefaultNodeStyle implements NodeStyle
 {
-	private final DefaultStyleConfiguration config;
+    protected final DefaultStyleConfiguration config;
 
 	DefaultNodeStyle( DefaultStyleConfiguration configuration )
 	{

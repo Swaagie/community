@@ -19,7 +19,6 @@
  */
 package org.neo4j.kernel.impl.nioneo.store;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
@@ -50,7 +49,7 @@ public abstract class AbstractStore extends CommonAbstractStore
         boolean rebuild_idgenerators_fast(boolean def);
     }
 
-    private Configuration conf;
+    private final Configuration conf;
 
     /**
      * Returns the fixed size of each record in this store.
@@ -166,10 +165,9 @@ public abstract class AbstractStore extends CommonAbstractStore
         logger.fine( "Rebuilding id generator for[" + getStorageFileName()
             + "] ..." );
         closeIdGenerator();
-        File file = new File( getStorageFileName() + ".id" );
-        if ( file.exists() )
+        if ( fileSystemAbstraction.fileExists( getStorageFileName() + ".id" ) )
         {
-            boolean success = file.delete();
+            boolean success = fileSystemAbstraction.deleteFile( getStorageFileName() + ".id" );
             assert success;
         }
         createIdGenerator( getStorageFileName() + ".id" );
@@ -187,7 +185,7 @@ public abstract class AbstractStore extends CommonAbstractStore
                 fullRebuild = false;
                 highId = findHighIdBackwards();
             }
-            ByteBuffer byteBuffer = ByteBuffer.wrap( new byte[1] );
+            ByteBuffer byteBuffer = ByteBuffer.allocate( recordSize );
             // Duplicated code block
             LinkedList<Long> freeIdList = new LinkedList<Long>();
             if ( fullRebuild )
@@ -196,18 +194,17 @@ public abstract class AbstractStore extends CommonAbstractStore
                     i++ )
                 {
                     fileChannel.position( i * recordSize );
+                    byteBuffer.clear();
                     fileChannel.read( byteBuffer );
                     byteBuffer.flip();
-                    byte inUse = byteBuffer.get();
-                    byteBuffer.flip();
-                    nextId();
-                    if ( (inUse & 0x1) == Record.NOT_IN_USE.byteValue() )
+                    if ( !isRecordInUse( byteBuffer ) )
                     {
                         freeIdList.add( i );
                     }
                     else
                     {
                         highId = i;
+                        setHighId( highId+1 );
                         while ( !freeIdList.isEmpty() )
                         {
                             freeId( freeIdList.removeFirst() );
