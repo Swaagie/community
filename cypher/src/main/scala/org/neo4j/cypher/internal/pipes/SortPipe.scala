@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,7 +20,7 @@
 package org.neo4j.cypher.internal.pipes
 
 import scala.math.signum
-import org.neo4j.cypher.commands.SortItem
+import org.neo4j.cypher.internal.commands.SortItem
 import java.lang.String
 import org.neo4j.cypher.internal.Comparer
 
@@ -34,7 +34,7 @@ class SortPipe(source: Pipe, sortDescription: List[SortItem]) extends Pipe with 
   def compareBy(a: Map[String, Any], b: Map[String, Any], order: Seq[SortItem]): Boolean = order match {
     case Nil => false
     case head :: tail => {
-      val key = head.returnItem.identifier.name
+      val key = head.expression.identifier.name
       val aVal = a(key)
       val bVal = b(key)
       signum(compare(aVal, bVal)) match {
@@ -45,10 +45,9 @@ class SortPipe(source: Pipe, sortDescription: List[SortItem]) extends Pipe with 
     }
   }
 
-
   override def executionPlan(): String = source.executionPlan() + "\r\nSort(" + sortDescription.mkString(",") + ")"
 
   private def assertDependenciesAreMet() {
-    sortDescription.map(_.returnItem.identifier).foreach( source.symbols.assertHas )
+    sortDescription.map(_.expression.identifier).foreach( source.symbols.assertHas )
   }
 }

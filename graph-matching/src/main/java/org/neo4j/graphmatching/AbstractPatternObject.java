@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,17 +19,22 @@
  */
 package org.neo4j.graphmatching;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.PropertyContainer;
 import org.neo4j.graphdb.Relationship;
-
-import java.util.*;
 
 /**
  * The base class for {@link PatternNode} and {@link PatternRelationship}.
  *
  * @param <T> either {@link Node} or {@link Relationship}.
  */
+@Deprecated
 public abstract class AbstractPatternObject<T extends PropertyContainer>
 {
     private T assocication;

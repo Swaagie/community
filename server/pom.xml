@@ -3,14 +3,14 @@
     <parent>
         <groupId>org.neo4j.build</groupId>
         <artifactId>parent-pom</artifactId>
-        <version>29</version>
+        <version>31</version>
         <relativePath />
     </parent>
 
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.neo4j.app</groupId>
     <artifactId>neo4j-server</artifactId>
-    <version>1.6-SNAPSHOT</version>
+    <version>1.7-SNAPSHOT</version>
     <name>Neo4j Server</name>
     <description>Standalone Neo4j server application.</description>
     <url>http://components.neo4j.org/${project.artifactId}/${project.version}</url>
@@ -26,7 +26,7 @@
         <neo4j-server.mainClass>org.neo4j.server.Bootstrapper</neo4j-server.mainClass>
         <neo-server.home>target/generated-resources/appassembler/jsw</neo-server.home>
         <neo-server.confdir>target/test-classes/etc/neo-server</neo-server.confdir>
-        <neo-server.test.hostname></neo-server.test.hostname>
+        <neo-server.test.hostname />
 
         <!-- This code name is injected into Webadmin, please update it
    when updating the project version. -->
@@ -34,20 +34,20 @@
 
         <felix-fileinstall.version>3.0.2</felix-fileinstall.version>
         <java.io.tmpdir>${project.build.directory}</java.io.tmpdir>
-        <blueprints.version>1.1</blueprints.version>
-        <gremlin.version>1.4</gremlin.version>
+        <blueprints.version>1.2</blueprints.version>
+        <gremlin.version>1.5</gremlin.version>
 
         <!-- Run integration tests against a server that is started elsewhere. This is used in ServerIntegrationTestFacade, which currently assumes external servers to be running at http://localhost:7474/ -->
         <testWithExternalServer>false</testWithExternalServer>
 
-        <webdriver.version>2.5.0</webdriver.version>
+        <webdriver.version>2.20.0</webdriver.version>
         <webdriver.implementation>Firefox</webdriver.implementation>
 
         <!-- Default location for chrome controller binary, used by webdriver for running tests in Chrome. Available from (http://code.google.com/p/chromium/downloads/list) see README.txt for details on this. -->
         <webdriver.chrome.driver>webdriver-binaries/chromedriver</webdriver.chrome.driver>
         <webdriver.chrome.driver.download.url>http://chromium.googlecode.com/files/chromedriver_mac_18.0.995.0.zip</webdriver.chrome.driver.download.url>
         <webdriver.sauce.labs.url>**Needs to provided externally by the CI job for security reasons**</webdriver.sauce.labs.url>
-        <webdriver.override.neo-server.baseuri></webdriver.override.neo-server.baseuri>
+        <webdriver.override.neo-server.baseuri />
     </properties>
 
     <scm>
@@ -78,14 +78,14 @@
         <dependency>
             <groupId>org.neo4j</groupId>
             <artifactId>neo4j</artifactId>
-            <version>1.6-SNAPSHOT</version>
+            <version>1.7-SNAPSHOT</version>
             <type>pom</type>
         </dependency>
 
         <dependency>
             <groupId>org.neo4j</groupId>
             <artifactId>neo4j-kernel</artifactId>
-            <version>1.6-SNAPSHOT</version>
+            <version>1.7-SNAPSHOT</version>
             <type>test-jar</type>
             <scope>test</scope>
         </dependency>
@@ -93,13 +93,13 @@
         <dependency>
             <groupId>org.neo4j</groupId>
             <artifactId>server-api</artifactId>
-            <version>1.6-SNAPSHOT</version>
+            <version>1.7-SNAPSHOT</version>
         </dependency>
 
         <dependency>
             <groupId>org.neo4j</groupId>
             <artifactId>neo4j-cypher</artifactId>
-            <version>1.6-SNAPSHOT</version>
+            <version>1.7-SNAPSHOT</version>
         </dependency>
 
         <dependency>
@@ -216,6 +216,23 @@
             </exclusions>
         </dependency>
 
+
+        <dependency>
+            <groupId>org.rrd4j</groupId>
+            <artifactId>rrd4j</artifactId>
+            <version>2.0.7</version>
+        </dependency>
+    
+
+        <!-- File uploads -->
+        <dependency>
+            <groupId>com.sun.jersey.contribs</groupId>
+            <artifactId>jersey-multipart</artifactId>
+            <version>1.9</version>
+        </dependency>
+
+        <!-- Test dependencies -->
+
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-all</artifactId>
@@ -231,32 +248,17 @@
         </dependency>
 
         <dependency>
-            <groupId>org.rrd4j</groupId>
-            <artifactId>rrd4j</artifactId>
-            <version>2.0.7</version>
-        </dependency>
-
-        <!-- File uploads -->
-        <dependency>
-            <groupId>com.sun.jersey.contribs</groupId>
-            <artifactId>jersey-multipart</artifactId>
-            <version>1.9</version>
-        </dependency>
-
-        <!-- Test dependencies -->
-
-        <dependency>
             <groupId>org.apache.httpcomponents</groupId>
             <artifactId>httpclient</artifactId>
-            <version>4.1.2</version>
             <scope>test</scope>
+            <version>4.1.3</version>
         </dependency>
 
         <dependency>
             <groupId>org.apache.httpcomponents</groupId>
             <artifactId>httpcore</artifactId>
-            <version>4.1.2</version>
             <scope>test</scope>
+            <version>4.1.3</version>
         </dependency>
 
         <dependency>
@@ -287,14 +289,14 @@
         <dependency>
             <groupId>org.neo4j</groupId>
             <artifactId>neo4j-graphviz</artifactId>
-            <version>1.6-SNAPSHOT</version>
+            <version>1.7-SNAPSHOT</version>
             <scope>test</scope>
         </dependency>
 
         <dependency>
             <groupId>org.neo4j</groupId>
             <artifactId>neo4j-shell</artifactId>
-            <version>1.6-SNAPSHOT</version>
+            <version>1.7-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>junit</groupId>
@@ -303,6 +305,11 @@
         <dependency>
             <groupId>org.hamcrest</groupId>
             <artifactId>hamcrest-all</artifactId>
+        </dependency>
+        <dependency>
+          <groupId>bouncycastle</groupId>
+          <artifactId>bcprov-jdk16</artifactId>
+          <version>140</version>
         </dependency>
     </dependencies>
 
@@ -569,6 +576,24 @@
                     <minifyOnlyAggregatedFiles>true</minifyOnlyAggregatedFiles>
                 </configuration>
             </plugin>
+            
+          <plugin>
+            <groupId>com.github.searls</groupId>
+            <artifactId>jasmine-maven-plugin</artifactId>
+            <version>1.1.0</version>
+            <executions>
+              <execution>
+                <goals>
+                  <goal>test</goal>
+                </goals>
+              </execution>
+            </executions>
+            <configuration>
+              <jsTestSrcDir>${project.build.outputDirectory}/webadmin-html/js/test</jsTestSrcDir>
+              <customRunnerTemplate>src/test/resources/SpecRunner.htmlTemplate</customRunnerTemplate>
+              <specRunnerTemplate>REQUIRE_JS</specRunnerTemplate>
+            </configuration>
+          </plugin>
 
           <plugin>
             <artifactId>maven-site-plugin</artifactId>
@@ -819,7 +844,7 @@
                 <repository>
                     <id>neo4j-dev</id>
                     <name>Neo4j Developer Repository</name>
-                    <url>https://repo.neo4j.org/content/groups/dev/</url>
+                    <url>http://m2.neo4j.org/content/groups/everything/</url>
                 </repository>
             </repositories>
         </profile>
@@ -855,22 +880,13 @@
             <url>http://download.java.net/maven/2/</url>
         </repository>
         <repository>
-            <id>tinkerpop-repository</id>
-            <name>TinkerPop Maven2 Repository</name>
-            <url>http://tinkerpop.com/maven2</url>
-            <snapshots>
-                <enabled>true</enabled>
-                <updatePolicy>daily</updatePolicy>
-            </snapshots>
-        </repository>
-        <repository>
             <id>selenium-repository</id>
             <url>http://selenium.googlecode.com/svn/repository</url>
         </repository>
         <repository>
             <id>neo4j-release-repository</id>
             <name>Neo4j Maven 2 release repository</name>
-            <url>http://m2.neo4j.org/releases</url>
+            <url>http://m2.neo4j.org/content/repositories/releases</url>
             <releases>
                 <enabled>true</enabled>
             </releases>
@@ -881,7 +897,7 @@
         <repository>
             <id>neo4j-snapshot-repository</id>
             <name>Neo4j Maven 2 snapshot repository</name>
-            <url>http://m2.neo4j.org/snapshots</url>
+            <url>http://m2.neo4j.org/content/repositories/snapshots</url>
             <snapshots>
                 <enabled>true</enabled>
             </snapshots>

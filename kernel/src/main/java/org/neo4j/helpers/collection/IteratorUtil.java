@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,8 +19,10 @@
  */
 package org.neo4j.helpers.collection;
 
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -469,5 +471,41 @@ public abstract class IteratorUtil
     public static ClosableIterator<String> asIterator( File file ) throws IOException
     {
         return new LinesOfFileIterator( file );
+    }
+    
+    public static <T> void streamToFile( Iterable<T> iterable, File file ) throws IOException
+    {
+        streamToFile( iterable.iterator(), file );
+    }
+
+    public static <T> void streamToFile( Iterator<T> iterator, File file ) throws IOException
+    {
+        if ( file.exists() ) throw new IOException( "File '" + file + "' already exists" );
+        PrintStream out = null;
+        try
+        {
+            out = new PrintStream( file );
+            while ( iterator.hasNext() ) out.println( iterator.next().toString() );
+        }
+        finally
+        {
+            safeClose( out );
+        }
+    }
+    
+    private static void safeClose( Closeable closeable )
+    {
+        if ( closeable != null )
+        {
+            try
+            {
+                closeable.close();
+            }
+            catch ( IOException e )
+            {
+                // What can we do?
+                e.printStackTrace();
+            }
+        }
     }
 }

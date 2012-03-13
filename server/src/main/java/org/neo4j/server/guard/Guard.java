@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,14 +19,14 @@
  */
 package org.neo4j.server.guard;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import static java.lang.System.currentTimeMillis;
+import static java.lang.Thread.currentThread;
 
 import java.util.Timer;
 import java.util.TimerTask;
 
-import static java.lang.System.currentTimeMillis;
-import static java.lang.Thread.currentThread;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 public class Guard {
 

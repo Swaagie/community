@@ -1,5 +1,5 @@
 Neo4j
-Copyright © 2002-2011 Network Engine for Objects in Lund AB (referred to
+Copyright © 2002-2012 Network Engine for Objects in Lund AB (referred to
 in this notice as “Neo Technology”)
    [http://neotechnology.com]
 
@@ -39,6 +39,9 @@ Development and Distribution License, version 1.1.
 The Mime  streaming plugin library  is licensed under the  GNU General
 Public  License  Version 2  with  classpath exception.   Alternatively
 under the Common Development and Distribution License, version 1.0.
+
+The Bouncy Castle encryption library is licensed under a modified version
+of the MIT X11 licence.
 
 Other bundled libraries are licenced according to the following listing.
 

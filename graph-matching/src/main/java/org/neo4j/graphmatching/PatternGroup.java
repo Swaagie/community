@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -28,6 +28,7 @@ import org.neo4j.graphmatching.filter.FilterExpression;
  * Represents a group in SPARQL. A group can carry filters, which can restrict
  * the returned result set.
  */
+@Deprecated
 public class PatternGroup
 {
     private Collection<FilterExpression> regexExpression =

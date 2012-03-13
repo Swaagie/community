@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,8 +19,8 @@
  */
 package org.neo4j.cypher.internal.pipes.matching
 
-import org.neo4j.cypher.commands.Predicate
 import org.neo4j.graphdb.Node
+import org.neo4j.cypher.internal.commands.{True, Predicate}
 
 class PatternMatcher(bindings: Map[String, MatchingPair], predicates: Seq[Predicate], includeOptionals: Boolean, source:Map[String,Any])
   extends Traversable[Map[String, Any]] {
@@ -33,13 +33,12 @@ class PatternMatcher(bindings: Map[String, MatchingPair], predicates: Seq[Predic
     traverseNode(boundNodes.values.toSet, new History(source), f)
   }
 
-  private def traverseNode[U](remaining: Set[MatchingPair],
-                              history: History,
-                              yielder: Map[String, Any] => U): Boolean = {
-
-    val current = remaining.head
-    val leftToDoAfterThisOne = remaining.tail
-
+  protected def traverseNextSpecificNode[U](remaining: Set[MatchingPair],
+                                            history: History,
+                                            yielder: (Map[String, Any]) => U,
+                                            current: MatchingPair,
+                                            leftToDoAfterThisOne: Set[MatchingPair],
+                                            alreadyInExtraWork: Boolean): Boolean = {
     debug(current, history, leftToDoAfterThisOne)
 
     if (!current.matchesBoundEntity(boundNodes)) {
@@ -60,10 +59,19 @@ class PatternMatcher(bindings: Map[String, MatchingPair], predicates: Seq[Predic
       case List(single) => traverseRelationship(current, single, newHistory, leftToDoAfterThisOne, yielder)
       case _ => traverseRelationship(current, notYetVisited.head, newHistory, remaining, yielder)
     }
-
   }
 
-  def traverseNextNodeFromRelationship[U](rel: GraphRelationship, gNode: Node, nextPNode: PatternNode, currentRel: PatternRelationship, history: History, remaining: Set[MatchingPair], yielder: (Map[String, Any]) => U): Boolean = {
+  private def traverseNode[U](remaining: Set[MatchingPair],
+                              history: History,
+                              yielder: Map[String, Any] => U): Boolean = {
+
+    val current = remaining.head
+    val leftToDoAfterThisOne = remaining.tail
+
+    traverseNextSpecificNode(remaining, history, yielder, current, leftToDoAfterThisOne, false)
+  }
+
+  private def traverseNextNodeFromRelationship[U](rel: GraphRelationship, gNode: Node, nextPNode: PatternNode, currentRel: PatternRelationship, history: History, remaining: Set[MatchingPair], yielder: (Map[String, Any]) => U): Boolean = {
     debug(rel, gNode, nextPNode, currentRel, history, remaining)
     val current = MatchingPair(currentRel, rel)
 
@@ -74,6 +82,11 @@ class PatternMatcher(bindings: Map[String, MatchingPair], predicates: Seq[Predic
     } else {
 
       val newHistory = history.add(current)
+      
+      currentRel.predicate match {
+        case True() =>
+        case p => if(!p.isMatch(newHistory.toMap)) return false
+      } 
 
       if (isMatchSoFar(newHistory)) {
         val nextNode = rel.getOtherNode(gNode)
@@ -170,7 +183,7 @@ class PatternMatcher(bindings: Map[String, MatchingPair], predicates: Seq[Predic
 
   val isDebugging = false
 
-  def debug[U](history: History, remaining: Set[MatchingPair]) {
+  private def debug[U](history: History, remaining: Set[MatchingPair]) {
     if (isDebugging)
       println(String.format("""traverseNextNodeOrYield
       history=%s
@@ -178,7 +191,7 @@ class PatternMatcher(bindings: Map[String, MatchingPair], predicates: Seq[Predic
       """, history, remaining.toList))
   }
 
-  def debug[U](current: MatchingPair, history: History, remaining: Set[MatchingPair]) {
+  private def debug[U](current: MatchingPair, history: History, remaining: Set[MatchingPair]) {
     if (isDebugging)
       println(String.format("""traverseNode
     current=%s
@@ -187,7 +200,7 @@ class PatternMatcher(bindings: Map[String, MatchingPair], predicates: Seq[Predic
     """, current, history, remaining.toList))
   }
 
-  def debug[U](current: MatchingPair, pRel: PatternRelationship, history: History, remaining: Set[MatchingPair]) {
+  private def debug[U](current: MatchingPair, pRel: PatternRelationship, history: History, remaining: Set[MatchingPair]) {
     if (isDebugging)
       println(String.format("""traverseRelationship
     current=%s
@@ -197,7 +210,7 @@ class PatternMatcher(bindings: Map[String, MatchingPair], predicates: Seq[Predic
     """, current, pRel, history, remaining.toList))
   }
 
-  def debug[U](history: History, resultMap: Map[String, Any]) {
+  private def debug[U](history: History, resultMap: Map[String, Any]) {
     if (isDebugging)
       println(String.format("""yield(history=%s) => %s
     """, history, resultMap))

@@ -20,8 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 define( 
   ['./splash'
-   'ribcage/storage/CookieStorage'], 
-  (template, CookieStorage) ->
+   'ribcage/storage/CookieStorage'
+   'lib/amd/jQuery'], 
+  (template, CookieStorage, $) ->
     
     class Splash
       
@@ -33,10 +34,10 @@ define(
           @show()
 
       hasBeenShownForThisSession : ->
-        @cookies.get("splashShown1.5") != null
+        @cookies.get("splashShown1.6") != null
 
       show : ->
-        @cookies.set("splashShown1.5", "1")
+        @cookies.set("splashShown1.6", "1")
         # Show boot screen for flashiness
         splash = $(template())
         $("body").append(splash)

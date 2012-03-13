@@ -1,5 +1,5 @@
 ###
-Copyright (c) 2002-2011 "Neo Technology,"
+Copyright (c) 2002-2012 "Neo Technology,"
 Network Engine for Objects in Lund AB [http://neotechnology.com]
 
 This file is part of Neo4j.
@@ -19,15 +19,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ###
 
 define(
-  ['./NodeView',
-   './RelationshipView',
-   './RelationshipListView',
-   './NodeListView',
-   './CypherResultView',
-   'ribcage/View',
-   './notfound',
-   'lib/backbone'], 
-  (NodeView, RelationshipView, RelationshipListView, NodeListView, CypherResultView, View, notFoundTemplate) ->
+  ['./NodeView'
+   './RelationshipView'
+   './RelationshipListView'
+   './NodeListView'
+   './CypherResultView'
+   'ribcage/View'
+   './notfound'
+   'lib/amd/jQuery'], 
+  (NodeView, RelationshipView, RelationshipListView, NodeListView, CypherResultView, View, notFoundTemplate, $) ->
   
     class SimpleView extends View
 

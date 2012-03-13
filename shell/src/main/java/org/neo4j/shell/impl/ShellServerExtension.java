@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -78,7 +78,14 @@ public final class ShellServerExtension extends KernelExtension<GraphDatabaseShe
     @Override
     protected void unload( GraphDatabaseShellServer server )
     {
-        server.shutdown();
+        try
+        {
+            server.shutdown();
+        }
+        catch ( RemoteException e )
+        {
+            // OK?
+        }
     }
 
     public void enableRemoteShell( KernelData kernel, Map<String, Serializable> config )

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,8 +19,8 @@
  */
 package org.neo4j.graphdb.index;
 
+import org.neo4j.graphdb.DependencyResolver;
 import org.neo4j.helpers.Service;
-import org.neo4j.kernel.KernelData;
 
 public abstract class IndexProvider extends Service
 {
@@ -32,7 +32,7 @@ public abstract class IndexProvider extends Service
         this.identifier = identifier;
     }
 
-    public abstract IndexImplementation load( KernelData kernel ) throws Exception;
+    public abstract IndexImplementation load( DependencyResolver dependencyResolver) throws Exception;
 
     public final String identifier()
     {

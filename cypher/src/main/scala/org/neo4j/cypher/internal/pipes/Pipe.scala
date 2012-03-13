@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,7 +20,7 @@
 package org.neo4j.cypher.internal.pipes
 
 import java.lang.String
-import org.neo4j.cypher.symbols.SymbolTable
+import org.neo4j.cypher.internal.symbols.SymbolTable
 
 /**
  * Pipe is a central part of Cypher. Most pipes are decorators - they
@@ -32,4 +32,12 @@ trait Pipe {
   def createResults[U](params: Map[String, Any]): Traversable[Map[String, Any]]
   def symbols: SymbolTable
   def executionPlan(): String
+}
+
+class NullPipe extends Pipe {
+  def createResults[U](params: Map[String, Any]): Traversable[Map[String, Any]] = Seq(Map())
+
+  def symbols: SymbolTable = new SymbolTable()
+
+  def executionPlan(): String = ""
 }

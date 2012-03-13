@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -90,6 +90,19 @@ public class ManageNodeFunctionalTest extends AbstractRestFunctionalTestBase
         assertTrue( response.getLocation()
                 .toString()
                 .matches( NODE_URI_PATTERN ) );
+    }
+    
+    @Test
+    public void create_Node_with_array_properties() throws Exception
+    {
+        String response = gen.get()
+                .payload( "{\"foo\" : [1,2,3]}" )
+                .expectedStatus( 201 )
+                .expectedHeader( "Location" )
+                .expectedHeader( "Content-Length" )
+                .post( functionalTestHelper.nodeUri() )
+                .response().getEntity();
+        assertThat( response, containsString( "[ 1, 2, 3 ]" ) );
     }
 
     /**

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,6 +19,11 @@
  */
 package org.neo4j.server.rest;
 
+import static junit.framework.Assert.assertEquals;
+
+import java.io.IOException;
+import java.net.URI;
+
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
@@ -28,11 +33,6 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.neo4j.server.helpers.FunctionalTestHelper;
 import org.neo4j.server.rest.domain.GraphDbHelper;
-
-import java.io.IOException;
-import java.net.URI;
-
-import static junit.framework.Assert.assertEquals;
 
 public class DisableWADLFunctionalTest extends AbstractRestFunctionalTestBase
 {

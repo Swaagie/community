@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -35,7 +35,7 @@ import org.neo4j.kernel.impl.util.ArrayMap;
 public class RelationshipTypeHolder
 {
     private ArrayMap<String,Integer> relTypes = 
-        new ArrayMap<String,Integer>( 5, true, true );
+        new ArrayMap<String,Integer>( (byte)5, true, true );
     private Map<Integer, RelationshipTypeImpl> relTranslation = new ConcurrentHashMap<Integer, RelationshipTypeImpl>();
 
     private final TransactionManager transactionManager;
@@ -43,9 +43,10 @@ public class RelationshipTypeHolder
     private final EntityIdGenerator idGenerator;
     private final RelationshipTypeCreator relTypeCreator;
 
-    RelationshipTypeHolder( TransactionManager transactionManager,
-        PersistenceManager persistenceManager, EntityIdGenerator idGenerator,
-        RelationshipTypeCreator relTypeCreator )
+    public RelationshipTypeHolder( TransactionManager transactionManager,
+                                   PersistenceManager persistenceManager, EntityIdGenerator idGenerator,
+                                   RelationshipTypeCreator relTypeCreator
+    )
     {
         this.transactionManager = transactionManager;
         this.persistenceManager = persistenceManager;

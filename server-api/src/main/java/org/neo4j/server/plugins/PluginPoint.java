@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,7 +19,7 @@
  */
 package org.neo4j.server.plugins;
 
-import org.neo4j.kernel.AbstractGraphDatabase;
+import org.neo4j.kernel.GraphDatabaseSPI;
 import org.neo4j.server.rest.repr.BadInputException;
 import org.neo4j.server.rest.repr.Representation;
 
@@ -56,7 +56,7 @@ public abstract class PluginPoint
         return description;
     }
 
-    public abstract Representation invoke( AbstractGraphDatabase graphDb, Object context,
+    public abstract Representation invoke( GraphDatabaseSPI graphDb, Object context,
             ParameterList params ) throws BadInputException, BadPluginInvocationException,
             PluginInvocationFailureException;
 

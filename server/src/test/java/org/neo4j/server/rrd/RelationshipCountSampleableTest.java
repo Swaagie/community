@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -28,7 +28,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Transaction;
-import org.neo4j.kernel.AbstractGraphDatabase;
+import org.neo4j.kernel.GraphDatabaseSPI;
 import org.neo4j.server.database.Database;
 import org.neo4j.server.rrd.sampler.RelationshipCountSampleable;
 import org.neo4j.test.ImpermanentGraphDatabase;
@@ -52,7 +52,7 @@ public class RelationshipCountSampleableTest
         assertThat( sampleable.getValue(), is( 1d ) );
     }
 
-    private void createARelationship( AbstractGraphDatabase db )
+    private void createARelationship( GraphDatabaseSPI db )
     {
         Transaction tx = db.beginTx();
         Node node1 = db.createNode();

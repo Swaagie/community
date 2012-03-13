@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -124,7 +124,7 @@ public class FileUtils
      * use {@link #renameFile(File, File)} instead. The reason this exists is
      * for convenience and error checking.
      * 
-     * @param toMove The File object to move. Cannot be a directory.
+     * @param toMove The File object to move.
      * @param targetDirectory
      * @return the new file, null iff the move was unsuccessful
      */
@@ -138,6 +138,19 @@ public class FileUtils
         String oldName = toMove.getName();
         File endFile = new File( targetDirectory, oldName );
         return renameFile( toMove, endFile ) ? toMove : null;
+    }
+
+    public static void moveFiles( File fromDirectory, File toDirectory )
+    {
+        if ( !fromDirectory.isDirectory() )
+        {
+            throw new IllegalArgumentException(
+                    "Move target must be a directory, not " + fromDirectory );
+        }
+        for ( File memberOf : fromDirectory.listFiles() )
+        {
+            moveFile( memberOf, toDirectory );
+        }
     }
 
     public static boolean renameFile( File srcFile, File renameToFile )
@@ -264,18 +277,6 @@ public class FileUtils
             {
                 copyFile( fromFile, toFile );
             }
-        }
-    }
-
-    public static String canonicalize( String path )
-    {
-        try
-        {
-            return new File( path ).getCanonicalFile().getAbsolutePath();
-        }
-        catch ( IOException e )
-        {
-            return new File( path ).getAbsolutePath();
         }
     }
 }

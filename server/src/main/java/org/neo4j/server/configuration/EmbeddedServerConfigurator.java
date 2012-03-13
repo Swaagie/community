@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,7 +24,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.configuration.Configuration;
-import org.neo4j.kernel.AbstractGraphDatabase;
+import org.neo4j.kernel.GraphDatabaseSPI;
 import org.neo4j.server.WrappingNeoServerBootstrapper;
 
 /**
@@ -52,7 +52,7 @@ public class EmbeddedServerConfigurator implements Configurator
     private MapBasedConfiguration config = new MapBasedConfiguration();
     private Set<ThirdPartyJaxRsPackage> jaxRsPackages = new HashSet<ThirdPartyJaxRsPackage>();
 
-    public EmbeddedServerConfigurator( AbstractGraphDatabase db )
+    public EmbeddedServerConfigurator( GraphDatabaseSPI db )
     {
         config.addProperty( DATABASE_LOCATION_PROPERTY_KEY, db.getStoreDir() );
     }

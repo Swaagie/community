@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,36 +24,35 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 
+import org.neo4j.kernel.IdGeneratorFactory;
 import org.neo4j.kernel.IdType;
 import org.neo4j.kernel.impl.util.StringLogger;
 
 public abstract class AbstractNameStore<T extends AbstractNameRecord> extends AbstractStore implements Store, RecordStore<T>
 {
+    public interface Configuration
+        extends AbstractStore.Configuration
+    {
+        
+    }
+    
     private DynamicStringStore nameStore;
-    protected static final int NAME_STORE_BLOCK_SIZE = 30;
+    public static final int NAME_STORE_BLOCK_SIZE = 30;
 
-    public AbstractNameStore( String fileName, Map<?, ?> config, IdType idType )
+    public AbstractNameStore(String fileName, Configuration configuration, IdType idType,
+                             IdGeneratorFactory idGeneratorFactory, FileSystemAbstraction fileSystemAbstraction, StringLogger stringLogger,
+                             DynamicStringStore nameStore)
     {
-        super( fileName, config, idType );
+        super( fileName, configuration, idType, idGeneratorFactory, fileSystemAbstraction, stringLogger );
+        this.nameStore = nameStore;
     }
-    
-    @Override
-    protected void initStorage()
-    {
-        nameStore = new DynamicStringStore( getStorageFileName() + getNameStorePostfix(), getConfig(), getNameIdType() );
-    }
-    
-    protected abstract IdType getNameIdType();
-
-    protected abstract String getNameStorePostfix();
 
     DynamicStringStore getNameStore()
     {
         return nameStore;
     }
-    
+
     @Override
     public int getRecordHeaderSize()
     {
@@ -201,7 +200,7 @@ public abstract class AbstractNameStore<T extends AbstractNameRecord> extends Ab
         {
             return newRecord( (int) id );
         }
-        
+
         try
         {
             return getRecord( (int) id, window, true );
@@ -211,7 +210,7 @@ public abstract class AbstractNameStore<T extends AbstractNameRecord> extends Ab
             releaseWindow( window );
         }
     }
-    
+
     @Override
     public T forceGetRaw( long id )
     {
@@ -293,7 +292,7 @@ public abstract class AbstractNameStore<T extends AbstractNameRecord> extends Ab
     {
         return (int) nameStore.nextBlockId();
     }
-    
+
     protected abstract T newRecord( int id );
 
     protected T getRecord( int id, PersistenceWindow window, boolean force )
@@ -303,13 +302,13 @@ public abstract class AbstractNameStore<T extends AbstractNameRecord> extends Ab
         boolean inUse = (inUseByte == Record.IN_USE.byteValue());
         if ( !inUse && !force )
         {
-            throw new InvalidRecordException( "Record[" + id + "] not in use" );
+            throw new InvalidRecordException( getClass().getSimpleName() + " Record[" + id + "] not in use" );
         }
         if ( inUseByte != Record.IN_USE.byteValue() && inUseByte != Record.NOT_IN_USE.byteValue() )
         {
-            throw new InvalidRecordException( "Record[" + id + "] unknown in use flag[" + inUse + "]" );
+            throw new InvalidRecordException( getClass().getSimpleName() + " Record[" + id + "] unknown in use flag[" + inUse + "]" );
         }
-        
+
         T record = newRecord( id );
         record.setInUse( inUse );
         readRecord( record, buffer );
@@ -384,9 +383,4 @@ public abstract class AbstractNameStore<T extends AbstractNameRecord> extends Ab
         return list;
     }
 
-    @Override
-    public void logIdUsage( StringLogger.LineLogger logger )
-    {
-        NeoStore.logIdUsage( logger, this );
-    }
 }

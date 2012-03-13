@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -28,6 +28,7 @@ import org.neo4j.graphdb.Relationship;
  * as the last {@link Relationship} and {@link PatternRelationship} to get
  * there.
  */
+@Deprecated
 public class PatternElement
 {
 	private PatternNode pNode;

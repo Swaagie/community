@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -33,7 +33,6 @@ import org.apache.commons.io.FileUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.neo4j.graphdb.TransactionFailureException;
 import org.neo4j.server.logging.InMemoryAppender;
 import org.neo4j.shell.ShellException;
 import org.neo4j.shell.ShellLobby;
@@ -93,7 +92,7 @@ public class DatabaseTest
         assertThat( appender.toString(), containsString( "Successfully shutdown database" ) );
     }
 
-    @Test( expected = TransactionFailureException.class )
+    @Test( expected = IllegalStateException.class )
     public void shouldComplainIfDatabaseLocationIsAlreadyInUse()
     {
         deletionFailureOk = true;

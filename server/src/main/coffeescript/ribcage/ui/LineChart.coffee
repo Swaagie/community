@@ -1,5 +1,5 @@
 ###
-Copyright (c) 2002-2011 "Neo Technology,"
+Copyright (c) 2002-2012 "Neo Technology,"
 Network Engine for Objects in Lund AB [http://neotechnology.com]
 
 This file is part of Neo4j.
@@ -22,8 +22,9 @@ define(
   ['lib/DateFormat'
    'ribcage/ui/Tooltip'
    'ribcage/security/HtmlEscaper'
-   'lib/jquery.flot','lib/backbone']
-  (DateFormat, Tooltip,HtmlEscaper) ->
+   'lib/amd/Flot'
+   'lib/amd/Underscore']
+  (DateFormat, Tooltip, HtmlEscaper, Flot, _ ) ->
 
     class LineChart
       

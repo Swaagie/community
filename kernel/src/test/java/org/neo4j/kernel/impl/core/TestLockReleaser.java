@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -43,13 +43,12 @@ public class TestLockReleaser extends AbstractNeo4jTestCase
         n.removeProperty( "dummy" );
         // Retrieve the primitive, necessary for getting its cow property map
         // below
-        NodeImpl primitive = getEmbeddedGraphDb().getConfig().getGraphDbModule().getNodeManager().getNodeForProxy(
-                n.getId() );
+        NodeImpl primitive = getEmbeddedGraphDb().getNodeManager().getNodeForProxy( n.getId(), null );
         /*
          *  The cow property remove map should be null (i.e. not created in the first place )
          *  since the property did not exist
          */
-        assertNull( getEmbeddedGraphDb().getConfig().getLockReleaser().getCowPropertyRemoveMap(
+        assertNull( getEmbeddedGraphDb().getLockReleaser().getCowPropertyRemoveMap(
                 primitive ) );
         getTransaction().finish();
     }

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -94,11 +94,22 @@ public class AbstractRestFunctionalTestBase extends SharedServerTestBase impleme
                + script + "----\n";
     }
     
+    protected String formatJavaScript( String script )
+    {
+        script = script.replace( ";", "\n" );
+        if ( !script.endsWith( "\n" ) )
+        {
+            script += "\n";
+        }
+        return "_Raw script source_\n\n" + "[source, javascript]\n" + "----\n"
+               + script + "----\n";
+    }
+    
     private Long idFor( String name ) {
         return data.get().get( name ).getId();
     }
     
-    private String createParameterString( Pair<String, String>[] params ) {
+    protected String createParameterString( Pair<String, String>[] params ) {
         String paramString = "\"params\": {";
         for( Pair<String, String> param : params ) {
             String delimiter = paramString.endsWith( "{" ) ? "" : ",";
@@ -119,7 +130,8 @@ public class AbstractRestFunctionalTestBase extends SharedServerTestBase impleme
     
     protected String startGraph( String name )
     {
-        return AsciidocHelper.createGraphViz( "Starting Graph", graphdb(), name);
+        return AsciidocHelper.createGraphVizWithNodeId( "Starting Graph",
+                graphdb(), name );
     }
 
     @Override
@@ -138,6 +150,11 @@ public class AbstractRestFunctionalTestBase extends SharedServerTestBase impleme
     protected String getDataUri()
     {
         return "http://localhost:7474/db/data/";
+    }
+
+    protected String getDatabaseUri()
+    {
+        return "http://localhost:7474/db/";
     }
 
     protected String getNodeUri( Node node )

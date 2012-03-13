@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,8 +24,8 @@ import org.neo4j.cypher.SyntaxException
 import java.lang.String
 import org.neo4j.graphdb.{Expander, DynamicRelationshipType, Node}
 import collection.Seq
-import org.neo4j.cypher.symbols.{NodeType, Identifier, PathType}
-import org.neo4j.cypher.commands.{ReturnItem, ShortestPath}
+import org.neo4j.cypher.internal.symbols.{NodeType, Identifier, PathType}
+import org.neo4j.cypher.internal.commands.{ReturnItem, ShortestPath}
 
 /**
  * Shortest pipe inserts a single shortest path between two already found nodes
@@ -41,7 +41,6 @@ abstract class ShortestPathPipe(source: Pipe, ast: ShortestPath) extends PipeWit
   def optional = ast.optional
   def pathName = ast.pathName
   def returnItems: Seq[ReturnItem] = Seq()
-
 
   def createResults[U](params: Map[String, Any]): Traversable[Map[String, Any]] = source.createResults(params).flatMap(m => {
     val (start, end) = getStartAndEnd(m)
@@ -59,13 +58,10 @@ abstract class ShortestPathPipe(source: Pipe, ast: ShortestPath) extends PipeWit
     (start, end)
   }
 
-  private def createExpander[U](): Expander = {
-    val expander = relType match {
+  private def createExpander[U](): Expander = relType match {
       case None => Traversal.expanderForAllTypes(dir)
       case Some(typeName) => Traversal.expanderForTypes(DynamicRelationshipType.withName(typeName), dir)
     }
-    expander
-  }
 
   def dependencies: Seq[Identifier] = Seq(Identifier(startName, NodeType()), Identifier(endName, NodeType()))
 

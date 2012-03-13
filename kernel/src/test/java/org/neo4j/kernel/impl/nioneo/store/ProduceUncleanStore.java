@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -33,7 +33,7 @@ public class ProduceUncleanStore
         Transaction tx = db.beginTx();
         Node node = db.createNode();
         node.setProperty( "name", "Something" );
-        if ( setGraphProperty ) db.getConfig().getGraphDbModule().getNodeManager().getGraphProperties().setProperty( "prop", "Some value" );
+        if ( setGraphProperty ) db.getNodeManager().getGraphProperties().setProperty( "prop", "Some value" );
         tx.success();
         tx.finish();
         System.exit( 0 );

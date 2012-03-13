@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -27,7 +27,6 @@ import javax.management.NotCompliantMBeanException;
 import javax.management.ObjectName;
 
 import org.neo4j.jmx.Kernel;
-import org.neo4j.kernel.Config;
 import org.neo4j.kernel.KernelData;
 import org.neo4j.kernel.impl.nioneo.xa.NeoStoreXaDataSource;
 import org.neo4j.kernel.impl.transaction.XaDataSourceManager;
@@ -77,8 +76,8 @@ public class KernelBean extends Neo4jMBean implements Kernel
 
     public static NeoStoreXaDataSource getNeoDataSource( KernelData kernel )
     {
-        XaDataSourceManager mgr = kernel.getConfig().getTxModule().getXaDataSourceManager();
-        return (NeoStoreXaDataSource) mgr.getXaDataSource( Config.DEFAULT_DATA_SOURCE_NAME );
+        XaDataSourceManager mgr = kernel.graphDatabase().getXaDataSourceManager();
+        return mgr.getNeoStoreDataSource();
     }
 
     public ObjectName getMBeanQuery()

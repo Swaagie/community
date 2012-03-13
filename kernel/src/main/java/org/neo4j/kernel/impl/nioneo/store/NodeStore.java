@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,7 +21,6 @@ package org.neo4j.kernel.impl.nioneo.store;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 import org.neo4j.kernel.IdGeneratorFactory;
 import org.neo4j.kernel.IdType;
@@ -32,14 +31,21 @@ import org.neo4j.kernel.impl.util.StringLogger;
  */
 public class NodeStore extends AbstractStore implements Store, RecordStore<NodeRecord>
 {
+    public interface Configuration
+        extends AbstractStore.Configuration
+    {
+
+    }
+
     public static final String TYPE_DESCRIPTOR = "NodeStore";
 
     // in_use(byte)+next_rel_id(int)+next_prop_id(int)
     public static final int RECORD_SIZE = 9;
 
-    public NodeStore( String fileName, Map<?,?> config )
+    public NodeStore(String fileName, Configuration config,
+                     IdGeneratorFactory idGeneratorFactory, FileSystemAbstraction fileSystemAbstraction, StringLogger stringLogger)
     {
-        super( fileName, config, IdType.NODE );
+        super(fileName, config, IdType.NODE, idGeneratorFactory, fileSystemAbstraction, stringLogger);
     }
 
     @Override
@@ -64,29 +70,6 @@ public class NodeStore extends AbstractStore implements Store, RecordStore<NodeR
     public int getRecordHeaderSize()
     {
         return getRecordSize();
-    }
-
-    /**
-     * Creates a new node store contained in <CODE>fileName</CODE> If filename
-     * is <CODE>null</CODE> or the file already exists an
-     * <CODE>IOException</CODE> is thrown.
-     *
-     * @param fileName
-     *            File name of the new node store
-     * @param config
-     *            Map of configuration parameters
-     */
-    public static void createStore( String fileName, Map<?, ?> config )
-    {
-        IdGeneratorFactory idGeneratorFactory = (IdGeneratorFactory) config.get(
-                IdGeneratorFactory.class );
-        FileSystemAbstraction fileSystem = (FileSystemAbstraction) config.get( FileSystemAbstraction.class );
-        createEmptyStore( fileName, buildTypeDescriptorAndVersion( TYPE_DESCRIPTOR ), idGeneratorFactory, fileSystem );
-        NodeStore store = new NodeStore( fileName, config );
-        NodeRecord nodeRecord = new NodeRecord( store.nextId(), Record.NO_NEXT_RELATIONSHIP.intValue(), Record.NO_NEXT_PROPERTY.intValue() );
-        nodeRecord.setInUse( true );
-        store.updateRecord( nodeRecord );
-        store.close();
     }
 
     public NodeRecord getRecord( long id )
@@ -114,7 +97,7 @@ public class NodeStore extends AbstractStore implements Store, RecordStore<NodeR
         {
             return new NodeRecord( id, Record.NO_NEXT_RELATIONSHIP.intValue(), Record.NO_NEXT_PROPERTY.intValue() ); // inUse=false by default
         }
-        
+
         try
         {
             return getRecord( id, window, RecordLoad.FORCE );
@@ -124,7 +107,7 @@ public class NodeStore extends AbstractStore implements Store, RecordStore<NodeR
             releaseWindow( window );
         }
     }
-    
+
     @Override
     public NodeRecord forceGetRaw( long id )
     {
@@ -214,7 +197,7 @@ public class NodeStore extends AbstractStore implements Store, RecordStore<NodeR
             switch ( load )
             {
             case NORMAL:
-                throw new InvalidRecordException( "Record[" + id + "] not in use" );
+                throw new InvalidRecordException( "NodeRecord[" + id + "] not in use" );
             case CHECK:
                 return null;
             }
@@ -268,9 +251,4 @@ public class NodeStore extends AbstractStore implements Store, RecordStore<NodeR
         return list;
     }
 
-    @Override
-    public void logIdUsage( StringLogger.LineLogger logger )
-    {
-        NeoStore.logIdUsage( logger, this );
-    }
 }

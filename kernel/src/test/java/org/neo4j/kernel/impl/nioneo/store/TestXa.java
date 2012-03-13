@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,9 +19,6 @@
  */
 package org.neo4j.kernel.impl.nioneo.store;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -29,12 +26,12 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.ReadableByteChannel;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import javax.transaction.TransactionManager;
 import javax.transaction.xa.XAResource;
 import javax.transaction.xa.Xid;
 
@@ -49,7 +46,7 @@ import org.neo4j.helpers.Pair;
 import org.neo4j.helpers.collection.MapUtil;
 import org.neo4j.kernel.CommonFactories;
 import org.neo4j.kernel.Config;
-import org.neo4j.kernel.IdGeneratorFactory;
+import org.neo4j.kernel.ConfigProxy;
 import org.neo4j.kernel.impl.AbstractNeo4jTestCase;
 import org.neo4j.kernel.impl.core.LockReleaser;
 import org.neo4j.kernel.impl.core.PropertyIndex;
@@ -59,15 +56,17 @@ import org.neo4j.kernel.impl.transaction.LockManager;
 import org.neo4j.kernel.impl.transaction.PlaceboTm;
 import org.neo4j.kernel.impl.transaction.XidImpl;
 import org.neo4j.kernel.impl.transaction.xaframework.LogBufferFactory;
+import org.neo4j.kernel.impl.transaction.xaframework.TransactionInterceptorProvider;
 import org.neo4j.kernel.impl.transaction.xaframework.TxIdGenerator;
+import org.neo4j.kernel.impl.transaction.xaframework.XaFactory;
 import org.neo4j.kernel.impl.util.StringLogger;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 @AbstractNeo4jTestCase.RequiresPersistentGraphDatabase
 public class TestXa extends AbstractNeo4jTestCase
 {
-    public static IdGeneratorFactory ID_GENERATOR_FACTORY =
-        CommonFactories.defaultIdGeneratorFactory();
-
     private NeoStoreXaDataSource ds;
     private NeoStoreXaConnection xaCon;
     private Logger log;
@@ -122,13 +121,15 @@ public class TestXa extends AbstractNeo4jTestCase
         log.setLevel( Level.OFF );
         deleteFileOrDirectory( new File( path() ) );
         propertyIndexes = new HashMap<String, PropertyIndex>();
-        NeoStore.createStore( file( "neo" ), MapUtil.map(
-                IdGeneratorFactory.class, ID_GENERATOR_FACTORY,
-                FileSystemAbstraction.class, CommonFactories.defaultFileSystemAbstraction() ) );
-        lockManager = getEmbeddedGraphDb().getConfig().getLockManager();
-        lockReleaser = getEmbeddedGraphDb().getConfig().getLockReleaser();
+
+        Map<String,String> config = new HashMap<String, String>();
+        StoreFactory sf = new StoreFactory(config, CommonFactories.defaultIdGeneratorFactory(), CommonFactories.defaultFileSystemAbstraction(), null, StringLogger.DEV_NULL, null);
+        sf.createNeoStore(file( "neo" )).close();
+
+        lockManager = getEmbeddedGraphDb().getLockManager();
+        lockReleaser = getEmbeddedGraphDb().getLockReleaser();
         ds = newNeoStore();
-        xaCon = (NeoStoreXaConnection) ds.getXaConnection();
+        xaCon = ds.getXaConnection();
     }
 
     @After
@@ -357,7 +358,7 @@ public class TestXa extends AbstractNeo4jTestCase
     {
         PropertyIndex result = propertyIndexes.get( key );
         if ( result != null ) return result;
-        
+
         int id = (int) ds.nextId( PropertyIndex.class );
         PropertyIndex index = new MyPropertyIndex( key, id );
         propertyIndexes.put( key, index );
@@ -377,8 +378,7 @@ public class TestXa extends AbstractNeo4jTestCase
         xaCon.getWriteTransaction().nodeCreate( node2 );
         PropertyData n1prop1 = xaCon.getWriteTransaction().nodeAddProperty(
                 node1, index( "prop1" ), "string1" );
-        xaCon.getWriteTransaction().nodeLoadProperties( node1,
-                xaCon.getWriteTransaction().nodeLoadLight( node1 ).getNextProp(), false );
+        xaCon.getWriteTransaction().nodeLoadProperties( node1, false );
         int relType1 = (int) ds.nextId( RelationshipType.class );
         xaCon.getWriteTransaction().createRelationshipType( relType1,
             "relationshiptype1" );
@@ -403,7 +403,7 @@ public class TestXa extends AbstractNeo4jTestCase
         deleteLogicalLogIfExist();
         renameCopiedLogicalLog( path() );
         ds = newNeoStore();
-        xaCon = (NeoStoreXaConnection) ds.getXaConnection();
+        xaCon = ds.getXaConnection();
         xaRes = xaCon.getXaResource();
         assertEquals( 0, xaRes.recover( XAResource.TMNOFLAGS ).length );
         xaCon.clearAllTransactions();
@@ -412,21 +412,24 @@ public class TestXa extends AbstractNeo4jTestCase
     private NeoStoreXaDataSource newNeoStore() throws InstantiationException,
             IOException
     {
-        Map<Object, Object> config = new HashMap<Object, Object>();
+        Map<String, String> config = new HashMap<String, String>();
         config.putAll( Config.getDefaultParams() );
-        MapUtil.genericMap( config,
-            LockManager.class, lockManager,
-            LockReleaser.class, lockReleaser,
-            IdGeneratorFactory.class, ID_GENERATOR_FACTORY,
-            FileSystemAbstraction.class, CommonFactories.defaultFileSystemAbstraction(),
-            LogBufferFactory.class, CommonFactories.defaultLogBufferFactory(),
-            TxIdGenerator.class, TxIdGenerator.DEFAULT,
-            StringLogger.class, StringLogger.DEV_NULL,
-            TransactionManager.class, new PlaceboTm(),
+        MapUtil.stringMap( config,
             "store_dir", path(),
             "neo_store", file( "neo" ),
             "logical_log", file( "nioneo_logical.log" ) );
-        return new NeoStoreXaDataSource( config );
+
+        StoreFactory sf = new StoreFactory(config, CommonFactories.defaultIdGeneratorFactory(), CommonFactories.defaultFileSystemAbstraction(), null, StringLogger.DEV_NULL, null);
+
+        PlaceboTm txManager = new PlaceboTm();
+        LogBufferFactory logBufferFactory = CommonFactories.defaultLogBufferFactory();
+        return new NeoStoreXaDataSource( ConfigProxy.config(config, NeoStoreXaDataSource.Configuration.class),
+                                         CommonFactories.defaultFileSystemAbstraction(),sf, lockManager, lockReleaser,
+                                         StringLogger.DEV_NULL, new XaFactory(config, TxIdGenerator.DEFAULT, txManager,
+                                                                              logBufferFactory,
+                                                                              CommonFactories.defaultFileSystemAbstraction(),
+                                                                              StringLogger.DEV_NULL, CommonFactories.defaultRecoveryVerifier() ),
+                                         Collections.<Pair<TransactionInterceptorProvider,Object>>emptyList(), null);
     }
 
     @Test
@@ -460,7 +463,7 @@ public class TestXa extends AbstractNeo4jTestCase
         deleteLogicalLogIfExist();
         renameCopiedLogicalLog( path() );
         ds = newNeoStore();
-        xaCon = (NeoStoreXaConnection) ds.getXaConnection();
+        xaCon = ds.getXaConnection();
         xaRes = xaCon.getXaResource();
         assertEquals( 1, xaRes.recover( XAResource.TMNOFLAGS ).length );
         xaRes.commit( xid, true );
@@ -494,7 +497,7 @@ public class TestXa extends AbstractNeo4jTestCase
         renameCopiedLogicalLog( path() );
 
         ds = newNeoStore();
-        xaCon = (NeoStoreXaConnection) ds.getXaConnection();
+        xaCon = ds.getXaConnection();
         xaRes = xaCon.getXaResource();
         assertEquals( 1, xaRes.recover( XAResource.TMNOFLAGS ).length );
         xaRes.commit( xid, true );
@@ -518,7 +521,7 @@ public class TestXa extends AbstractNeo4jTestCase
         deleteLogicalLogIfExist();
         renameCopiedLogicalLog( path() );
         ds = newNeoStore();
-        xaCon = (NeoStoreXaConnection) ds.getXaConnection();
+        xaCon = ds.getXaConnection();
         xaRes = xaCon.getXaResource();
         assertEquals( 1, xaRes.recover( XAResource.TMNOFLAGS ).length );
         xaRes.commit( xid, true );
@@ -554,7 +557,7 @@ public class TestXa extends AbstractNeo4jTestCase
         renameCopiedLogicalLog( path() );
 
         ds = newNeoStore();
-        xaCon = (NeoStoreXaConnection) ds.getXaConnection();
+        xaCon = ds.getXaConnection();
         xaRes = xaCon.getXaResource();
 
         xid = new XidImpl( new byte[2], new byte[2] );
@@ -574,7 +577,7 @@ public class TestXa extends AbstractNeo4jTestCase
         renameCopiedLogicalLog( path() );
 
         ds = newNeoStore();
-        xaCon = (NeoStoreXaConnection) ds.getXaConnection();
+        xaCon = ds.getXaConnection();
         xaRes = xaCon.getXaResource();
         xid = new XidImpl( new byte[2], new byte[2] );
         xaRes = xaCon.getXaResource();
@@ -583,7 +586,7 @@ public class TestXa extends AbstractNeo4jTestCase
         assertTrue( Arrays.equals(
                 (long[]) toRead.getValue(),
                 (long[]) xaCon.getWriteTransaction().nodeLoadProperties( node1,
-                        xaCon.getWriteTransaction().nodeLoadLight( node1 ).getNextProp(), false ).get( toRead.getIndex() ).getValue() ) );
+                        false ).get( toRead.getIndex() ).getValue() ) );
 
         xaRes.end( xid, XAResource.TMSUCCESS );
         xaRes.prepare( xid );
@@ -618,7 +621,7 @@ public class TestXa extends AbstractNeo4jTestCase
         renameCopiedLogicalLog( path() );
 
         ds = newNeoStore();
-        xaCon = (NeoStoreXaConnection) ds.getXaConnection();
+        xaCon = ds.getXaConnection();
         xaRes = xaCon.getXaResource();
         assertEquals( 1, xaRes.recover( XAResource.TMNOFLAGS ).length );
         xaRes.commit( xid, true );
@@ -637,7 +640,7 @@ public class TestXa extends AbstractNeo4jTestCase
         renameCopiedLogicalLog( path() );
 
         ds = newNeoStore();
-        xaCon = (NeoStoreXaConnection) ds.getXaConnection();
+        xaCon = ds.getXaConnection();
         xaRes = xaCon.getXaResource();
         assertEquals( 1, xaRes.recover( XAResource.TMNOFLAGS ).length );
         xaRes.commit( xid, true );
@@ -679,7 +682,7 @@ public class TestXa extends AbstractNeo4jTestCase
         deleteLogicalLogIfExist();
         renameCopiedLogicalLog( path() );
         ds = newNeoStore();
-        xaCon = (NeoStoreXaConnection) ds.getXaConnection();
+        xaCon = ds.getXaConnection();
         xaRes = xaCon.getXaResource();
         assertEquals( 0, xaRes.recover( XAResource.TMNOFLAGS ).length );
     }
@@ -702,7 +705,7 @@ public class TestXa extends AbstractNeo4jTestCase
         renameCopiedLogicalLog( path() );
         truncateLogicalLog( 94 );
         ds = newNeoStore();
-        xaCon = (NeoStoreXaConnection) ds.getXaConnection();
+        xaCon = ds.getXaConnection();
         xaRes = xaCon.getXaResource();
         assertEquals( 0, xaRes.recover( XAResource.TMNOFLAGS ).length );
         xaCon.clearAllTransactions();
@@ -726,7 +729,7 @@ public class TestXa extends AbstractNeo4jTestCase
         renameCopiedLogicalLog( path() );
         truncateLogicalLog( 94 );
         ds = newNeoStore();
-        xaCon = (NeoStoreXaConnection) ds.getXaConnection();
+        xaCon = ds.getXaConnection();
         xaRes = xaCon.getXaResource();
         assertEquals( 0, xaRes.recover( XAResource.TMNOFLAGS ).length );
         xaCon.clearAllTransactions();
@@ -753,7 +756,7 @@ public class TestXa extends AbstractNeo4jTestCase
         renameCopiedLogicalLog( path() );
         truncateLogicalLog( 243 );
         ds = newNeoStore();
-        xaCon = (NeoStoreXaConnection) ds.getXaConnection();
+        xaCon = ds.getXaConnection();
         xaRes = xaCon.getXaResource();
         assertEquals( 0, xaRes.recover( XAResource.TMNOFLAGS ).length );
         xaCon.clearAllTransactions();
@@ -780,7 +783,7 @@ public class TestXa extends AbstractNeo4jTestCase
         renameCopiedLogicalLog( path() );
         truncateLogicalLog( 264 );
         ds = newNeoStore();
-        xaCon = (NeoStoreXaConnection) ds.getXaConnection();
+        xaCon = ds.getXaConnection();
         xaRes = xaCon.getXaResource();
         assertEquals( 1, xaRes.recover( XAResource.TMNOFLAGS ).length );
         xaCon.clearAllTransactions();
@@ -811,8 +814,7 @@ public class TestXa extends AbstractNeo4jTestCase
         xaCon.getWriteTransaction().nodeCreate( node2 );
         PropertyData n1prop1 = xaCon.getWriteTransaction().nodeAddProperty(
                 node1, index( "prop1" ), "string1" );
-        xaCon.getWriteTransaction().nodeLoadProperties( node1,
-                xaCon.getWriteTransaction().nodeLoadLight( node1 ).getNextProp(), false );
+        xaCon.getWriteTransaction().nodeLoadProperties( node1, false );
         int relType1 = (int) ds.nextId( RelationshipType.class );
         xaCon.getWriteTransaction().createRelationshipType( relType1, "relationshiptype1" );
         long rel1 = ds.nextId( Relationship.class );

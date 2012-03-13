@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -33,7 +33,7 @@ import org.neo4j.graphdb.index.AutoIndexer;
 import org.neo4j.graphdb.index.Index;
 import org.neo4j.graphdb.index.IndexManager;
 import org.neo4j.helpers.collection.MapUtil;
-import org.neo4j.kernel.AbstractGraphDatabase;
+import org.neo4j.kernel.EmbeddedGraphDatabase;
 import org.neo4j.server.database.Database;
 import org.neo4j.server.database.DatabaseBlockedException;
 
@@ -58,10 +58,7 @@ public class GraphDbHelper
 
     private int numberOfEntitiesFor( Class<? extends PropertyContainer> type ) throws DatabaseBlockedException
     {
-        return (int) ( (AbstractGraphDatabase) database.graph ).getConfig()
-                .getGraphDbModule()
-                .getNodeManager()
-                .getNumberOfIdsInUse( type );
+        return (int) ( (EmbeddedGraphDatabase) database.graph ).getNodeManager().getNumberOfIdsInUse( type );
     }
 
     public Map<String, Object> getNodeProperties( long nodeId ) throws DatabaseBlockedException

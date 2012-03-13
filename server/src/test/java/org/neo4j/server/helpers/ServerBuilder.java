@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -85,6 +85,7 @@ public class ServerBuilder
     private String host = null;
     private String[] securityRuleClassNames;
     private boolean persistent;
+    private Boolean httpsEnabled = false;
 
     public static ServerBuilder server()
     {
@@ -127,7 +128,7 @@ public class ServerBuilder
                 new Jetty6WebServer(), serverModules );
     }
 
-    private Bootstrapper createBootstrapper()
+    protected Bootstrapper createBootstrapper()
     {
         return persistent ? new NeoServerBootstrapper() : new EphemeralNeoServerBootstrapper();
     }
@@ -185,6 +186,15 @@ public class ServerBuilder
             String propertyKeys = org.apache.commons.lang.StringUtils.join( securityRuleClassNames, "," );
             properties.put( Configurator.SECURITY_RULES_KEY, propertyKeys );
         }
+        
+        if(httpsEnabled != null) {
+            if(httpsEnabled) {
+                properties.put( Configurator.WEBSERVER_HTTPS_ENABLED_PROPERTY_KEY, "true" );
+            } else {
+                properties.put( Configurator.WEBSERVER_HTTPS_ENABLED_PROPERTY_KEY, "false" );
+            }
+        }
+        
         ServerTestUtils.writePropertiesToFile( properties, temporaryConfigFile );
     }
 
@@ -232,7 +242,7 @@ public class ServerBuilder
         return f;
     }
 
-    private ServerBuilder()
+    protected ServerBuilder()
     {
     }
 
@@ -392,6 +402,12 @@ public class ServerBuilder
     public ServerBuilder withSecurityRules( String... securityRuleClassNames )
     {
         this.securityRuleClassNames = securityRuleClassNames;
+        return this;
+    }
+    
+    public ServerBuilder withHttpsEnabled()
+    {
+        httpsEnabled  = true;
         return this;
     }
 }

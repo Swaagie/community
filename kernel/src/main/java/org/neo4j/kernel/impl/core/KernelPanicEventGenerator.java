@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,32 +19,32 @@
  */
 package org.neo4j.kernel.impl.core;
 
-import java.util.Collection;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import org.neo4j.graphdb.event.ErrorState;
-import org.neo4j.graphdb.event.KernelEventHandler;
+import org.neo4j.kernel.KernelEventHandlers;
 
 public class KernelPanicEventGenerator
 {
-    private final Collection<KernelEventHandler> handlers;
+    private KernelEventHandlers kernelEventHandlers;
 
-    public KernelPanicEventGenerator( Collection<KernelEventHandler> handlers )
+    public KernelPanicEventGenerator( KernelEventHandlers kernelEventHandlers )
     {
-        this.handlers = handlers;
+        this.kernelEventHandlers = kernelEventHandlers;
     }
     
     public void generateEvent( final ErrorState error )
     {
-        new Thread( "Kernel panic event generator" )
+        ExecutorService executor = Executors.newSingleThreadExecutor(  );
+        executor.execute( new Runnable()
         {
             @Override
             public void run()
             {
-                for ( KernelEventHandler handler : handlers )
-                {
-                    handler.kernelPanic( error );
-                }
+                kernelEventHandlers.kernelPanic( error );
             }
-        }.start();
+        } );
+        executor.shutdown();
     }
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,9 +22,7 @@ package org.neo4j.ext.udc.impl;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.not;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 
 import java.io.File;
 import java.io.IOException;
@@ -152,6 +150,55 @@ public class UdcExtensionImplTest
         EmbeddedGraphDatabase graphdb = createTempDatabase( config );
         assertGotSuccessWithRetry( IS_GREATER_THAN_ZERO );
         assertEquals( "test", handler.getQueryMap().get( "source" ) );
+
+        destroy( graphdb );
+    }
+
+    @Test
+    public void shouldBeAbleToSpecifyRegistrationIdWithConfig() throws Exception
+    {
+        // first, set up the test server
+        LocalTestServer server = new LocalTestServer( null, null );
+        PingerHandler handler = new PingerHandler();
+        server.register( "/*", handler );
+        server.start();
+
+        final String hostname = server.getServiceHostName();
+        final String serverAddress = hostname + ":" + server.getServicePort();
+
+        Map<String, String> config = new HashMap<String, String>();
+        config.put( UdcExtensionImpl.FIRST_DELAY_CONFIG_KEY, "100" );
+        config.put( UdcExtensionImpl.UDC_HOST_ADDRESS_KEY, serverAddress );
+        config.put( UdcExtensionImpl.UDC_SOURCE_KEY, "test" );
+        config.put( UdcExtensionImpl.UDC_REGISTRATION_KEY, "marketoid" );
+
+        EmbeddedGraphDatabase graphdb = createTempDatabase( config );
+        assertGotSuccessWithRetry( IS_GREATER_THAN_ZERO );
+        assertEquals( "marketoid", handler.getQueryMap().get( "reg" ) );
+
+        destroy( graphdb );
+    }
+
+
+    @Test
+    public void shouldIncludeMacAddressInConfig() throws Exception
+    {
+        // first, set up the test server
+        LocalTestServer server = new LocalTestServer( null, null );
+        PingerHandler handler = new PingerHandler();
+        server.register( "/*", handler );
+        server.start();
+
+        final String hostname = server.getServiceHostName();
+        final String serverAddress = hostname + ":" + server.getServicePort();
+
+        Map<String, String> config = new HashMap<String, String>();
+        config.put( UdcExtensionImpl.FIRST_DELAY_CONFIG_KEY, "100" );
+        config.put( UdcExtensionImpl.UDC_HOST_ADDRESS_KEY, serverAddress );
+
+        EmbeddedGraphDatabase graphdb = createTempDatabase( config );
+        assertGotSuccessWithRetry( IS_GREATER_THAN_ZERO );
+        assertNotNull(handler.getQueryMap().get("mac"));
 
         destroy( graphdb );
     }

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -30,6 +30,7 @@ import org.mortbay.jetty.Server;
 import org.neo4j.server.NeoServer;
 import org.neo4j.server.guard.Guard;
 import org.neo4j.server.rest.security.SecurityRule;
+import org.neo4j.server.security.KeyStoreInformation;
 
 public interface WebServer
 {
@@ -40,6 +41,12 @@ public interface WebServer
     void setPort( int portNo );
 
     void setAddress( String addr );
+    
+    void setEnableHttps( boolean enable );
+    
+    void setHttpsPort( int portNo );
+    
+    void setHttpsCertificateInformation( KeyStoreInformation config );
 
     void start();
 
@@ -60,4 +67,5 @@ public interface WebServer
 
     @Deprecated
     Server getJetty();
+    
 }

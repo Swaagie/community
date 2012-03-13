@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -25,8 +25,10 @@ import static org.junit.Assert.fail;
 import static org.neo4j.helpers.collection.MapUtil.loadStrictly;
 import static org.neo4j.helpers.collection.MapUtil.stringMap;
 import static org.neo4j.kernel.Config.ENABLE_REMOTE_SHELL;
+import static org.neo4j.visualization.asciidoc.AsciidocHelper.createGraphVizWithNodeId;
 
 import java.io.File;
+import java.io.PrintWriter;
 
 import org.junit.Test;
 import org.neo4j.graphdb.GraphDatabaseService;
@@ -187,8 +189,18 @@ public class ShellTest
                 "return zionist.name",
                 "",
                 "Morpheus' friends, looking up Morpheus by name in the Neo4j autoindex" );
+        doc.add( "cypher 1.5 start morpheus = node:node_auto_index(name='Morpheus') " +
+                "match morpheus-[:KNOWS]-zionist " +
+                "return zionist.name",
+                "",
+                "Morpheus' friends, looking up Morpheus by name in the Neo4j autoindex" );
         doc.run();
         server.shutdown();
+        PrintWriter writer = doc.getWriter( "shell-matrix-example-graph" );
+        writer.println( createGraphVizWithNodeId( "Shell Matrix Example", db,
+                "graph" ) );
+        writer.flush();
+        writer.close();
         db.shutdown();
     }
 

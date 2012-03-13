@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -53,4 +53,14 @@ public interface UdcProperties {
      * Configuration key for overriding the source parameter in UDC
      */
     public static final String UDC_SOURCE_KEY = "neo4j.ext.udc.source";
+
+    /**
+     * Unique registration id
+     */
+    public static final String UDC_REGISTRATION_KEY = "neo4j.ext.udc.reg";
+
+    /**
+     * Ethernet mac address
+     */
+    public static final String UDC_MAC_KEY = "neo4j.ext.udc.mac";
 }

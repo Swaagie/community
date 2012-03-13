@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,23 +19,25 @@
  */
 package org.neo4j.kernel.impl.nioneo.store;
 
+import java.io.File;
+import java.io.IOException;
+import java.net.URL;
+import java.util.HashMap;
+import java.util.Map;
+
+import org.junit.Ignore;
+import org.junit.Test;
+import org.neo4j.kernel.CommonFactories;
+import org.neo4j.kernel.ConfigProxy;
+import org.neo4j.kernel.impl.storemigration.StoreMigrator;
+import org.neo4j.kernel.impl.util.FileUtils;
+import org.neo4j.kernel.impl.util.StringLogger;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.junit.internal.matchers.StringContains.containsString;
-
-import java.io.File;
-import java.io.IOException;
-import java.net.URL;
-import java.util.HashMap;
-
-import org.junit.Ignore;
-import org.junit.Test;
-import org.neo4j.kernel.CommonFactories;
-import org.neo4j.kernel.IdGeneratorFactory;
-import org.neo4j.kernel.impl.storemigration.StoreMigrator;
-import org.neo4j.kernel.impl.util.FileUtils;
 
 public class StoreVersionTest
 {
@@ -47,13 +49,10 @@ public class StoreVersionTest
         assertTrue( outputDir.mkdirs() );
         String storeFileName = new File( outputDir, NeoStore.DEFAULT_NAME ).getPath();
 
-        HashMap config = new HashMap();
-        config.put( IdGeneratorFactory.class, CommonFactories.defaultIdGeneratorFactory() );
-        config.put( FileSystemAbstraction.class, CommonFactories.defaultFileSystemAbstraction() );
+        Map<String,String> config = new HashMap<String, String>();
         config.put( "neo_store", storeFileName );
-
-        NeoStore.createStore( storeFileName, config );
-        NeoStore neoStore = new NeoStore( config );
+        StoreFactory sf = new StoreFactory(config, CommonFactories.defaultIdGeneratorFactory(), CommonFactories.defaultFileSystemAbstraction(), null, StringLogger.SYSTEM, null);
+        NeoStore neoStore = sf.createNeoStore(storeFileName);
 
         CommonAbstractStore[] stores = {
                 neoStore.getNodeStore(),
@@ -82,12 +81,10 @@ public class StoreVersionTest
         File workingFile = new File( outputDir, "neostore.nodestore.db" );
         FileUtils.copyFile( new File( legacyStoreResource.getFile() ), workingFile );
 
-        HashMap config = new HashMap();
-        config.put( IdGeneratorFactory.class, CommonFactories.defaultIdGeneratorFactory() );
-        config.put( FileSystemAbstraction.class, CommonFactories.defaultFileSystemAbstraction() );
+        Map<String,String> config = new HashMap<String,String>();
 
         try {
-            new NodeStore( workingFile.getPath(), config );
+            new NodeStore( workingFile.getPath(), ConfigProxy.config(config, NodeStore.Configuration.class), CommonFactories.defaultIdGeneratorFactory(), CommonFactories.defaultFileSystemAbstraction(), StringLogger.SYSTEM );
             fail( "Should have thrown exception" );
         } catch ( NotCurrentStoreVersionException e ) {
             //expected
@@ -105,20 +102,15 @@ public class StoreVersionTest
 
         String storeFileName = new File( outputDir, NeoStore.DEFAULT_NAME ).getPath();
 
-        HashMap config = new HashMap();
-        config.put( IdGeneratorFactory.class,
-                CommonFactories.defaultIdGeneratorFactory() );
-        config.put( FileSystemAbstraction.class,
-                CommonFactories.defaultFileSystemAbstraction() );
+        Map<String,String> config = new HashMap<String, String>();
         config.put( "neo_store", storeFileName );
-
-        NeoStore.createStore( storeFileName, config );
-        NeoStore neoStore = new NeoStore( config );
+        StoreFactory sf = new StoreFactory(config, CommonFactories.defaultIdGeneratorFactory(), CommonFactories.defaultFileSystemAbstraction(), null, StringLogger.SYSTEM, null);
+        NeoStore neoStore = sf.createNeoStore(storeFileName);
         // The first checks the instance method, the other the public one
         assertEquals( CommonAbstractStore.ALL_STORES_VERSION,
                 NeoStore.versionLongToString( neoStore.getStoreVersion() ) );
         assertEquals( CommonAbstractStore.ALL_STORES_VERSION,
-                NeoStore.versionLongToString( NeoStore.getStoreVersion( storeFileName ) ) );
+                NeoStore.versionLongToString( NeoStore.getStoreVersion( CommonFactories.defaultFileSystemAbstraction(), storeFileName ) ) );
     }
 
     @Test

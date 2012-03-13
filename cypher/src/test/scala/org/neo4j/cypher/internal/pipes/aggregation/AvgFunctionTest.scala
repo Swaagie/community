@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -17,62 +17,54 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.neo4j.cypher.pipes.aggregation
+package org.neo4j.cypher.internal.pipes.aggregation
 
 import org.junit.Test
 import org.junit.Assert._
-import org.neo4j.cypher.commands.Entity
+import org.neo4j.cypher.internal.commands.Expression
 
-class AvgFunctionTest {
+class AvgFunctionTest extends AggregateTest {
+  def createAggregator(inner: Expression) = new AvgFunction(inner)
+
   @Test def singleOne() {
-    val result = avgOn(1)
+    val result = aggregateOn(1)
 
     assertEquals(1.0, result)
   }
 
   @Test def allOnesAvgIsOne() {
-    val result = avgOn(1, 1)
+    val result = aggregateOn(1, 1)
 
     assertEquals(1.0, result)
   }
 
   @Test def twoAndEightAvgIs10() {
-    val result = avgOn(2, 8)
+    val result = aggregateOn(2, 8)
 
     assertEquals(5.0, result)
   }
 
   @Test def negativeOneIsStillOk() {
-    val result = avgOn(-1)
+    val result = aggregateOn(-1)
 
     assertEquals(-1.0, result)
   }
 
   @Test def ZeroIsAnOKAvg() {
-    val result = avgOn(-10, 10)
+    val result = aggregateOn(-10, 10)
 
     assertEquals(0.0, result)
   }
 
   @Test def ADoubleInTheListTurnsTheAvgToDouble() {
-    val result = avgOn(1, 1.0, 1)
+    val result = aggregateOn(1, 1.0, 1)
 
     assertEquals(1.0, result)
   }
 
   @Test def nullDoesntChangeThings() {
-    val result = avgOn(3, null, 6)
+    val result = aggregateOn(3, null, 6)
 
     assertEquals(4.5, result)
-  }
-
-  def avgOn(values: Any*): Any = {
-    val func = new AvgFunction(Entity("x"))
-
-    values.foreach(value => {
-      func(Map("x" -> value))
-    })
-
-    func.result
   }
 }

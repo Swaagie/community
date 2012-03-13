@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -23,6 +23,7 @@ import java.io.PrintStream;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public abstract class BreakPoint implements DebuggerDeadlockCallback
 {
@@ -31,7 +32,7 @@ public abstract class BreakPoint implements DebuggerDeadlockCallback
         ENTRY,
         EXIT
     }
-    
+
     public BreakPoint( Class<?> type, String method, Class<?>... args )
     {
         this(Event.ENTRY,type,method,args);
@@ -48,7 +49,7 @@ public abstract class BreakPoint implements DebuggerDeadlockCallback
             this.args[i] = args[i].getName();
         }
     }
-    
+
     @Override
     public String toString()
     {
@@ -60,6 +61,22 @@ public abstract class BreakPoint implements DebuggerDeadlockCallback
             result.append( args[i] );
         }
         return result.append( ")]" ).toString();
+    }
+
+    public final int invocationCount()
+    {
+        return count.get();
+    }
+
+    public final int resetInvocationCount()
+    {
+        return count.getAndSet( 0 );
+    }
+
+    final void invoke( DebugInterface debug ) throws KillSubProcess
+    {
+        count.incrementAndGet();
+        callback( debug );
     }
 
     protected abstract void callback( DebugInterface debug ) throws KillSubProcess;
@@ -74,9 +91,17 @@ public abstract class BreakPoint implements DebuggerDeadlockCallback
     final String type;
     private final String method;
     private final String[] args;
+    private final AtomicInteger count = new AtomicInteger();
     volatile boolean enabled = false;
     private @SuppressWarnings( "restriction" )
     com.sun.jdi.request.EventRequest request = null;
+
+    @SuppressWarnings( "restriction" )
+    public synchronized boolean isEnabled()
+    {
+        if ( request != null ) return request.isEnabled();
+        return enabled;
+    }
 
     @SuppressWarnings( "restriction" )
     public synchronized BreakPoint enable()
@@ -148,14 +173,20 @@ public abstract class BreakPoint implements DebuggerDeadlockCallback
             }
         };
     }
-    
+
     public static BreakPoint thatCrashesTheProcess( final CountDownLatch crashNotification,
             final int letNumberOfCallsPass, Class<?> type, String method, Class<?>... args )
     {
-        return new BreakPoint( type, method, args )
+        return thatCrashesTheProcess( Event.ENTRY, crashNotification, letNumberOfCallsPass, type, method, args );
+    }
+    
+    public static BreakPoint thatCrashesTheProcess( Event event, final CountDownLatch crashNotification,
+            final int letNumberOfCallsPass, Class<?> type, String method, Class<?>... args )
+    {
+        return new BreakPoint( event, type, method, args )
         {
             private volatile int numberOfCalls;
-            
+
             @Override
             protected void callback( DebugInterface debug ) throws KillSubProcess
             {
@@ -163,7 +194,7 @@ public abstract class BreakPoint implements DebuggerDeadlockCallback
                 {
                     return;
                 }
-                
+
                 debug.thread().suspend( null );
                 this.disable();
                 crashNotification.countDown();

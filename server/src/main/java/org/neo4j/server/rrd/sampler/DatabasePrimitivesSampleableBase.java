@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,19 +19,18 @@
  */
 package org.neo4j.server.rrd.sampler;
 
-import org.neo4j.kernel.AbstractGraphDatabase;
+import org.neo4j.kernel.GraphDatabaseSPI;
 import org.neo4j.kernel.impl.core.NodeManager;
 import org.neo4j.server.rrd.Sampleable;
 import org.rrd4j.DsType;
 
 public abstract class DatabasePrimitivesSampleableBase implements Sampleable
 {
-
     private final NodeManager nodeManager;
 
-    public DatabasePrimitivesSampleableBase( AbstractGraphDatabase db )
+    public DatabasePrimitivesSampleableBase( GraphDatabaseSPI db )
     {
-        nodeManager = db.getConfig().getGraphDbModule().getNodeManager();
+        nodeManager = db.getNodeManager();
     }
 
     protected NodeManager getNodeManager()

@@ -1,5 +1,5 @@
 ###
-Copyright (c) 2002-2011 "Neo Technology,"
+Copyright (c) 2002-2012 "Neo Technology,"
 Network Engine for Objects in Lund AB [http://neotechnology.com]
 
 This file is part of Neo4j.
@@ -24,8 +24,7 @@ define(
    './views/ShellConsoleView'
    './views/GremlinConsoleView'
    './views/HttpConsoleView'
-   'ribcage/Router'
-   'lib/backbone'], 
+   'ribcage/Router'], 
   (Console, HttpConsole, ShellConsoleView, GremlinConsoleView, HttpConsoleView, Router) ->
   
     class ConsoleRouter extends Router

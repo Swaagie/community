@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,7 +20,6 @@
 package org.neo4j.kernel.impl.nioneo.store;
 
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -45,6 +44,13 @@ public class PropertyRecord extends Abstract64BitRecord
     public PropertyRecord( long id )
     {
         super( id );
+    }
+
+    public PropertyRecord( long id, PrimitiveRecord primitive )
+    {
+        super( id );
+        setCreated();
+        primitive.setIdTo( this );
     }
 
     public void setNodeId( long nodeId )
@@ -159,30 +165,15 @@ public class PropertyRecord extends Abstract64BitRecord
         buf.append( "Property[" ).append( getId() ).append( ",used=" ).append( inUse() ).append( ",prev=" ).append(
                 prevProp ).append( ",next=" ).append( nextProp );
         if ( entityId != -1 ) buf.append( nodeIdSet ? ",node=" : ",rel=" ).append( entityId );
-        buf.append( ", Value[" );
-        Iterator<PropertyBlock> itr = blockRecords.iterator();
-        while ( itr.hasNext() )
+        for ( PropertyBlock block : blockRecords )
         {
-            buf.append( itr.next() );
-            if ( itr.hasNext() )
-            {
-                buf.append( ", " );
-            }
+            buf.append( ',' ).append( block );
         }
-        buf.append( "], DeletedDynRecs[" );
-        if ( !deletedRecords.isEmpty() )
+        for ( DynamicRecord dyn : deletedRecords )
         {
-            Iterator<DynamicRecord> it = deletedRecords.iterator();
-            while ( it.hasNext() )
-            {
-                buf.append( it.next() );
-                if ( it.hasNext() )
-                {
-                    buf.append( ", " );
-                }
-            }
+            buf.append( ",del:" ).append( dyn );
         }
-        buf.append( "]]" );
+        buf.append( "]" );
         return buf.toString();
     }
 
@@ -191,9 +182,10 @@ public class PropertyRecord extends Abstract64BitRecord
         return isChanged;
     }
 
-    public void setChanged()
+    public void setChanged( PrimitiveRecord primitive )
     {
         isChanged = true;
+        primitive.setIdTo( this );
     }
 
     public long getPrevProp()

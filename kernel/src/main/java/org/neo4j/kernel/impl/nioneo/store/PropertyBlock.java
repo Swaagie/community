@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,12 +19,14 @@
  */
 package org.neo4j.kernel.impl.nioneo.store;
 
+import java.lang.reflect.Array;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
 public class PropertyBlock
 {
+    private static final int MAX_ARRAY_TOSTRING_SIZE = 4;
     private final List<DynamicRecord> valueRecords = new LinkedList<DynamicRecord>();
     private long[] valueBlocks;
     // private boolean inUse;
@@ -163,32 +165,47 @@ public class PropertyBlock
     public String toString()
     {
         StringBuffer result = new StringBuffer("PropertyBlock[");
-        // result.append( inUse() ? "inUse, " : "notInUse, " );
-        result.append( valueBlocks == null ? -1 : getKeyIndexId() ).append(
-                ", " ).append( getType() );
-        result.append( ", " ).append(
-                valueBlocks == null ? "null" : "blocks[" + valueBlocks.length
-                                               + "]" ).append(
-                ", " );
-        result.append( "ValueRecords[" );
+        PropertyType type = getType();
+        result.append( type == null ? "<unknown type>" : type.name() ).append( ',' );
+        result.append( "key=" ).append( valueBlocks == null ? "?" : Integer.toString( getKeyIndexId() ) );
+        if ( type != null ) switch ( type )
+        {
+        case STRING:
+        case ARRAY:
+            result.append( ",firstDynamic=" ).append( getSingleValueBlock() );
+            break;
+        default:
+            Object value = type.getValue( this, null );
+            if ( value != null && value.getClass().isArray() )
+            {
+                int length = Array.getLength( value );
+                StringBuilder buf = new StringBuilder( value.getClass().getComponentType().getSimpleName() ).append( "[" );
+                for ( int i = 0; i < length && i <= MAX_ARRAY_TOSTRING_SIZE; i++ )
+                {
+                    if ( i != 0 ) buf.append( "," );
+                    buf.append( Array.get( value, i ) );
+                }
+                if ( length > MAX_ARRAY_TOSTRING_SIZE ) buf.append( ",..." );
+                value = buf.append( "]" );
+            }
+            result.append( ",value=" ).append( value );
+            break;
+        }
         if ( !isLight() )
         {
+            result.append( ",ValueRecords[" );
             Iterator<DynamicRecord> recIt = valueRecords.iterator();
             while ( recIt.hasNext() )
             {
                 result.append( recIt.next() );
                 if ( recIt.hasNext() )
                 {
-                    result.append( ", " );
+                    result.append( ',' );
                 }
             }
+            result.append( ']' );
         }
-        else
-        {
-            result.append( "<none>" );
-        }
-
-        result.append( "]]" );
+        result.append( ']' );
         return result.toString();
     }
 }

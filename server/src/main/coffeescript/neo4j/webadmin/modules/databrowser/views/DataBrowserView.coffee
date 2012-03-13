@@ -1,5 +1,5 @@
 ###
-Copyright (c) 2002-2011 "Neo Technology,"
+Copyright (c) 2002-2012 "Neo Technology,"
 Network Engine for Objects in Lund AB [http://neotechnology.com]
 
 This file is part of Neo4j.
@@ -19,13 +19,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ###
 
 define(
-  ['neo4j/webadmin/utils/ItemUrlResolver',
-   './TabularView',
-   './VisualizedView',
-   './CreateRelationshipDialog',
-   'ribcage/View',
-   './base','lib/backbone'], 
-  (ItemUrlResolver, TabularView, VisualizedView, CreateRelationshipDialog, View, template) ->
+  ['neo4j/webadmin/utils/ItemUrlResolver'
+   './TabularView'
+   './VisualizedView'
+   './CreateRelationshipDialog'
+   'ribcage/View'
+   './base'
+   'lib/amd/jQuery'], 
+  (ItemUrlResolver, TabularView, VisualizedView, CreateRelationshipDialog, View, template, $) ->
 
     class DataBrowserView extends View
       
@@ -98,17 +99,16 @@ define(
 
       switchView : (ev) =>
         if @viewType == "visualized"
-          $(ev.target).removeClass("tabular")
+          $(ev.target).removeClass("tabular") if ev?
           @switchToTabularView()
         else
-          $(ev.target).addClass("tabular")
+          $(ev.target).addClass("tabular") if ev? 
           @switchToVisualizedView()
         
         @renderDataView()
           
 
       switchToVisualizedView : =>
-        
         if @dataView?
           @dataView.detach()
         

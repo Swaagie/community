@@ -1,7 +1,5 @@
-package org.neo4j.cypher.pipes.aggregation
-
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,67 +17,60 @@ package org.neo4j.cypher.pipes.aggregation
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+package org.neo4j.cypher.internal.pipes.aggregation
 
 import org.junit.Assert._
 import org.junit.Test
-import org.neo4j.cypher.SyntaxException
-import org.scalatest.junit.JUnitSuite
-import org.neo4j.cypher.commands.Entity
+import org.neo4j.cypher.CypherTypeException
+import org.scalatest.Assertions
+import org.neo4j.cypher.internal.commands.Expression
 
-class SumFunctionTest extends JUnitSuite {
+class SumFunctionTest extends AggregateTest with Assertions {
+  def createAggregator(inner: Expression) = new SumFunction(inner)
+
   @Test def singleValueReturnsThatNumber() {
-    val result = sumOn(1)
+    val result = aggregateOn(1)
 
     assertEquals(1, result)
     assertTrue(result.isInstanceOf[Int])
   }
 
   @Test def singleValueOfDecimalReturnsDecimal() {
-    val result = sumOn(1.0d)
+    val result = aggregateOn(1.0d)
 
     assertEquals(1.0, result)
     assertTrue(result.isInstanceOf[Double])
   }
 
   @Test def mixOfIntAndDoubleYieldsDouble() {
-    val result = sumOn(1, 1.0d)
+    val result = aggregateOn(1, 1.0d)
 
     assertEquals(2.0, result)
     assertTrue(result.isInstanceOf[Double])
   }
 
   @Test def mixedLotsOfStuff() {
-    val result = sumOn(1.byteValue(), 1.shortValue())
+    val result = aggregateOn(1.byteValue(), 1.shortValue())
 
     assertEquals(2, result)
     assertTrue(result.isInstanceOf[Int])
   }
 
   @Test def noNumbersEqualsZero() {
-    val result = sumOn()
+    val result = aggregateOn()
 
     assertEquals(0, result)
     assertTrue(result.isInstanceOf[Int])
   }
 
   @Test def nullDoesNotChangeTheSum() {
-    val result = sumOn(1, null)
+    val result = aggregateOn(1, null)
 
     assertEquals(1, result)
     assertTrue(result.isInstanceOf[Int])
   }
 
-  @Test(expected = classOf[SyntaxException]) def noNumberValuesThrowAnException() {
-    sumOn(1, "wut")
-  }
-
-  def sumOn(values: Any*): Any = {
-    val func = new SumFunction(Entity("x"))
-
-    values.foreach(value => {
-      func(Map("x" -> value))
-    })
-
-    func.result
+  @Test def noNumberValuesThrowAnException() {
+    intercept[CypherTypeException](aggregateOn(1, "wut"))
   }
 }

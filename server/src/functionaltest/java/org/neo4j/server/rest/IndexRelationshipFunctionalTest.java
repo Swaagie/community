@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,6 +19,12 @@
  */
 package org.neo4j.server.rest;
 
+import static java.util.Arrays.asList;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.neo4j.server.helpers.FunctionalTestHelper.CLIENT;
+
 import java.io.IOException;
 import java.net.URI;
 import java.util.Arrays;
@@ -29,8 +35,6 @@ import java.util.Map;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response.Status;
-
-import static java.util.Arrays.asList;
 
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -44,11 +48,6 @@ import org.neo4j.server.rest.domain.JsonHelper;
 import org.neo4j.server.rest.domain.JsonParseException;
 import org.neo4j.server.rest.domain.URIHelper;
 import org.neo4j.server.rest.web.PropertyValueException;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.neo4j.server.helpers.FunctionalTestHelper.CLIENT;
 
 public class IndexRelationshipFunctionalTest extends AbstractRestFunctionalTestBase
 {

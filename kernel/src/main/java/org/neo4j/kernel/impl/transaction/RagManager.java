@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,6 +19,13 @@
  */
 package org.neo4j.kernel.impl.transaction;
 
+import org.neo4j.graphdb.TransactionFailureException;
+import org.neo4j.kernel.DeadlockDetectedException;
+import org.neo4j.kernel.impl.util.ArrayMap;
+
+import javax.transaction.SystemException;
+import javax.transaction.Transaction;
+import javax.transaction.TransactionManager;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -26,14 +33,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Stack;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import javax.transaction.SystemException;
-import javax.transaction.Transaction;
-import javax.transaction.TransactionManager;
-
-import org.neo4j.graphdb.TransactionFailureException;
-import org.neo4j.kernel.DeadlockDetectedException;
-import org.neo4j.kernel.impl.util.ArrayMap;
 
 /**
  * The Resource Allocation Graph manager is used for deadlock detection. It
@@ -57,7 +56,7 @@ import org.neo4j.kernel.impl.util.ArrayMap;
  * to the tx ( T1 wants to wait on R1 and R1->T2->R2->T3->R8->T1 <==>
  * deadlock!).
  */
-class RagManager
+public class RagManager
 {
     // if a runtime exception is thrown from any method it means that the
     // RWLock class hasn't kept the contract to the RagManager
@@ -77,13 +76,13 @@ class RagManager
         new HashMap<Object,List<Transaction>>();
 
     private final ArrayMap<Transaction,Object> waitingTxMap =
-        new ArrayMap<Transaction,Object>( 5, false, true );
+        new ArrayMap<Transaction,Object>( (byte)5, false, true );
 
     private final TransactionManager tm;
 
     private final AtomicInteger deadlockCount = new AtomicInteger();
 
-    RagManager( TransactionManager tm )
+    public RagManager( TransactionManager tm )
     {
         this.tm = tm;
     }
@@ -207,11 +206,11 @@ class RagManager
                 if ( circle == null )
                 {
                     circle = new StringBuffer();
-                    circle.append( lockingTx + " <- " + resource );
+                    circle.append( lockingTx + " <-[:HELD_BY]- " + resource );
                 }
                 else
                 {
-                    circle.append( " <- " + lockingTx + " <- " + resource );
+                    circle.append( " <-[:WAITING_FOR]- " + lockingTx + " <-[:HELD_BY]- " + resource );
                 }
             }
             while ( !graphStack.isEmpty() );

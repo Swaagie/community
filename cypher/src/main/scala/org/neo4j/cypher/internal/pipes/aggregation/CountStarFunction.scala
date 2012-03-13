@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -17,15 +17,15 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.neo4j.cypher.pipes.aggregation
+package org.neo4j.cypher.internal.pipes.aggregation
 
 class CountStarFunction extends AggregationFunction {
-  var count = 0
+  var count:Long = 0
 
   def apply(data: Map[String, Any]) {
-    count = count + 1
+    count += 1
   }
 
-  def result: Int = count
+  def result: Long = count
 }
 

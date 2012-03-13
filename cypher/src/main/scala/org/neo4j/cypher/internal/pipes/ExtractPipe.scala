@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,30 +20,30 @@
 package org.neo4j.cypher.internal.pipes
 
 import java.lang.String
-import org.neo4j.cypher.commands._
 import collection.Seq
 import collection.immutable.Map
-import org.neo4j.cypher.symbols.{SymbolTable, Identifier}
+import org.neo4j.cypher.internal.commands.{Expression, ReturnItem}
+import org.neo4j.cypher.internal.symbols.{AnyType, SymbolTable, Identifier}
 
 //This class will extract properties and other stuff to make the maps
 //easy to work with for other pipes
-class ExtractPipe(source: Pipe, val returnItems: Seq[ReturnItem]) extends PipeWithSource(source) {
-  def dependencies = returnItems.flatMap(_.dependencies)
+class ExtractPipe(source: Pipe, val expressions: Seq[Expression]) extends PipeWithSource(source) {
+  def dependencies = expressions.flatMap(_.dependencies(AnyType()))
 
   type MapTransformer = Map[String, Any] => Map[String, Any]
 
   def getSymbolType(item: ReturnItem): Identifier = item.identifier
 
-  val symbols: SymbolTable = source.symbols.add(returnItems.map(_.identifier):_*)
+  val symbols: SymbolTable = source.symbols.add(expressions.map(_.identifier):_*)
 
 
   def createResults[U](params: Map[String, Any]): Traversable[Map[String, Any]] = {
     source.createResults(params).map(row => {
-      val projection: Map[String, Any] = returnItems.map( returnItem =>returnItem.columnName -> returnItem(row) ).toMap
+      val projection: Map[String, Any] = expressions.map( exp =>exp.identifier.name -> exp(row) ).toMap
       projection ++ row
     })
   }
 
-  override def executionPlan(): String = source.executionPlan() + "\r\nExtract([" + source.symbols.keys.mkString(",") + "] => [" + returnItems.map(_.columnName).mkString(", ") + "])"
+  override def executionPlan(): String = source.executionPlan() + "\r\nExtract([" + source.symbols.keys.mkString(",") + "] => [" + expressions.map(_.identifier.name).mkString(", ") + "])"
 }
 

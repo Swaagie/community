@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -90,9 +90,7 @@ public class JavaTestDocsGenerator extends AsciiDocGenerator
 
     public void addImageSnippet( String tagName, String imageName, String title )
     {
-        this.addSnippet( tagName, "\nimage:"+imageName+"["+title+"scaledwidth=75%]\n" );
-        
+        this.addSnippet( tagName, "\nimage:" + imageName + "[" + title
+                                  + "scaledwidth=75%]\n" );
     }
-
-    
 }

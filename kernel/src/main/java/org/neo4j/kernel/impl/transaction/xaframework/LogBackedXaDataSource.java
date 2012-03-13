@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,18 +21,24 @@ package org.neo4j.kernel.impl.transaction.xaframework;
 
 import java.io.IOException;
 import java.nio.channels.ReadableByteChannel;
-import java.util.Map;
 
 import org.neo4j.helpers.Pair;
 
 public abstract class LogBackedXaDataSource extends XaDataSource
 {
+    public interface Configuration
+    {
+        // TODO This config should be split into a boolean and a string (keep_logical_logs vs kept_logical_logs)
+        String keep_logical_logs(String def);
+
+        boolean online_backup_enabled( boolean def );
+    }
+
     private XaLogicalLog logicalLog;
 
-    public LogBackedXaDataSource( Map<?, ?> params )
-            throws InstantiationException
+    public LogBackedXaDataSource( byte branchId[], String name)
     {
-        super( params );
+        super( branchId, name );
     }
 
     /**
@@ -125,7 +131,7 @@ public abstract class LogBackedXaDataSource extends XaDataSource
     @Override
     public Pair<Integer,Long> getMasterForCommittedTx( long txId ) throws IOException
     {
-        return logicalLog.getMasterIdForCommittedTransaction( txId );
+        return logicalLog.getMasterForCommittedTransaction( txId );
     }
     
     @Override

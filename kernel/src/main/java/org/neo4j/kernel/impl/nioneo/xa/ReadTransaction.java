@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -26,7 +26,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
-import javax.transaction.xa.XAResource;
+import javax.transaction.SystemException;
+import javax.transaction.Transaction;
 
 import org.neo4j.helpers.Pair;
 import org.neo4j.kernel.impl.core.PropertyIndex;
@@ -196,7 +197,7 @@ class ReadTransaction implements NeoStoreTransaction
             return null;
         }
         ArrayMap<Integer, PropertyData> propertyMap = new ArrayMap<Integer, PropertyData>(
-                chain.size(), false, true );
+                (byte)9, false, true );
         for ( PropertyRecord propRecord : chain )
         {
             for ( PropertyBlock propBlock : propRecord.getPropertyBlocks() )
@@ -233,9 +234,9 @@ class ReadTransaction implements NeoStoreTransaction
     }
 
     @Override
-    public ArrayMap<Integer,PropertyData> nodeLoadProperties( long nodeId, long firstProp, boolean light )
+    public ArrayMap<Integer,PropertyData> nodeLoadProperties( long nodeId, boolean light )
     {
-        return loadProperties( getPropertyStore(), firstProp );
+        return loadProperties( getPropertyStore(), getNodeStore().getRecord( nodeId ).getNextProp() );
     }
     
     @Override
@@ -298,7 +299,8 @@ class ReadTransaction implements NeoStoreTransaction
     }
 
     @Override
-    public XAResource getXAResource()
+    public boolean delistResource( Transaction tx, int tmsuccess )
+        throws SystemException
     {
         throw readOnlyException();
     }

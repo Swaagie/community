@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -52,7 +52,7 @@ class CoFavoritedPlacesTest extends DocumentingTestBase {
       		RETURN stuff.name, count(*) 
       		ORDER BY count(*) DESC, stuff.name""",
       returns = "The list of places that are favorited by people that favorited the start place.",
-      (p) => assertEquals(List(Map("stuff.name" -> "MelsPlace", "count(*)" -> 2),
+      assertions = (p) => assertEquals(List(Map("stuff.name" -> "MelsPlace", "count(*)" -> 2),
           Map("stuff.name" -> "CoffeShop2", "count(*)" -> 1),
           Map("stuff.name" -> "SaunaX", "count(*)" -> 1)),p.toList))
   } 
@@ -65,11 +65,11 @@ class CoFavoritedPlacesTest extends DocumentingTestBase {
 * Determine the tags for place x.
 * What else is tagged the same as x that is not x.""",
       queryText = """START place=node:node_auto_index(name = "CoffeeShop1") 
-      		MATCH place-[:tagged]->tag<-[:tagged]-otherPlace 
+      		MATCH place-[:tagged]->tag<-[:tagged]-otherPlace
       	    RETURN otherPlace.name, collect(tag.name) 
       		ORDER By otherPlace.name desc""",
       returns = "The list of possible friends ranked by them liking similar stuff that are not yet friends.",
-      (p) => {
+      assertions = (p) => {
         assertEquals(List(Map("otherPlace.name" -> "MelsPlace", "collect(tag.name)" -> List("Cool", "Cosy")),
                 Map("otherPlace.name" -> "CoffeeShop3", "collect(tag.name)" -> List("Cosy")),
                 Map("otherPlace.name" -> "CoffeeShop2", "collect(tag.name)" -> List("Cool"))),p.toList)

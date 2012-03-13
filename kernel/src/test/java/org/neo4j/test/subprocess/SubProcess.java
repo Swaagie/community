@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -281,7 +281,7 @@ public abstract class SubProcess<T, P> implements Serializable
             }
             throw new IllegalArgumentException( "Not a sub process: " + o );
         }
-        
+
         volatile Handler handler;
         private final com.sun.jdi.event.EventQueue queue;
         private final Map<String, List<BreakPoint>> breakpoints;
@@ -399,7 +399,7 @@ public abstract class SubProcess<T, P> implements Serializable
             {
                 if ( breakpoint.matches( method.name(), method.argumentTypeNames() ) )
                 {
-                    if ( breakpoint.enabled ) breakpoint.callback( new DebugInterface( this, event ) );
+                    if ( breakpoint.enabled ) breakpoint.invoke( new DebugInterface( this, event ) );
                 }
             }
         }

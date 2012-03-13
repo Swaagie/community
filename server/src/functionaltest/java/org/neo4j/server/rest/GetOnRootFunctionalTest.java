@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -51,7 +51,7 @@ public class GetOnRootFunctionalTest extends AbstractRestFunctionalTestBase
         AbstractGraphDatabase db = (AbstractGraphDatabase)graphdb();
         Transaction tx = db.beginTx();
         long referenceNodeId = data.get().get("I").getId();
-        db.getConfig().getGraphDbModule().setReferenceNodeId( referenceNodeId );
+        db.getNodeManager().setReferenceNodeId( referenceNodeId );
         tx.success();
         tx.finish();
         String body = gen.get().expectedStatus( 200 ).get( getDataUri() ).entity();

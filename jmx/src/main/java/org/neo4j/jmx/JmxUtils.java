@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,18 +19,25 @@
  */
 package org.neo4j.jmx;
 
-import org.neo4j.kernel.AbstractGraphDatabase;
+import static java.lang.String.format;
 
-import javax.management.*;
 import java.lang.management.ManagementFactory;
 
-import static java.lang.String.format;
+import javax.management.AttributeNotFoundException;
+import javax.management.InstanceNotFoundException;
+import javax.management.MBeanException;
+import javax.management.MBeanServer;
+import javax.management.MalformedObjectNameException;
+import javax.management.ObjectName;
+import javax.management.ReflectionException;
+
+import org.neo4j.kernel.GraphDatabaseSPI;
 
 public class JmxUtils {
 
     private static final MBeanServer mbeanServer = ManagementFactory.getPlatformMBeanServer();
 
-    public static ObjectName getObjectName(AbstractGraphDatabase database, String name) {
+    public static ObjectName getObjectName(GraphDatabaseSPI database, String name) {
         ObjectName neoQuery = database.getSingleManagementBean(Kernel.class).getMBeanQuery();
         String instance = neoQuery.getKeyProperty("instance");
         String domain = neoQuery.getDomain();

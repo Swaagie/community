@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -604,14 +604,16 @@ public interface StyleParameter
 		PROPERTY_AS_KEY_EQUALS_VALUE
 		{
 			@Override
-			public final void configure( StyleConfiguration configuration )
+            public final void configure( final StyleConfiguration configuration )
 			{
 				PropertyFormatter format = new PropertyFormatter()
 				{
 					public String format( String key, PropertyType type,
 					    Object value )
 					{
-						return key + " = " + PropertyType.format( value );
+                        return configuration.escapeLabel( key )
+                               + " = "
+                               + configuration.escapeLabel( PropertyType.format( value ) );
 					}
 				};
 				configuration.setNodePropertyFomatter( format );
@@ -622,14 +624,15 @@ public interface StyleParameter
 		PROPERTY_AS_KEY_COLON_TYPE
 		{
 			@Override
-			public final void configure( StyleConfiguration configuration )
+            public final void configure( final StyleConfiguration configuration )
 			{
 				PropertyFormatter format = new PropertyFormatter()
 				{
 					public String format( String key, PropertyType type,
 					    Object value )
 					{
-						return key + " : " + type.typeName;
+                        return configuration.escapeLabel( key ) + " : "
+                               + type.typeName;
 					}
 				};
 				configuration.setNodePropertyFomatter( format );

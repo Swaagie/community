@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -31,7 +31,6 @@ import java.util.HashSet;
 import java.util.Set;
 
 import org.neo4j.shell.Console;
-import org.neo4j.shell.Session;
 import org.neo4j.shell.ShellClient;
 import org.neo4j.shell.ShellException;
 import org.neo4j.shell.ShellServer;
@@ -71,7 +70,6 @@ public abstract class AbstractClient implements ShellClient
     private Console console;
     private long timeConnection;
     private final Set<String> grabbedKeysFromServer = new HashSet<String>();
-    private final SessionImpl session = new SessionImpl();
     private volatile boolean end;
     private final Collection<String> multiLine = new ArrayList<String>();
     
@@ -296,14 +294,8 @@ public abstract class AbstractClient implements ShellClient
         return timeConnection;
     }
     
-    public Session session()
-    {
-        return this.session;
-    }
-    
     public void shutdown()
     {
-        if ( session.writer != null ) this.tryUnexport( session.writer );
     }
 
     protected void tryUnexport( Remote remote )

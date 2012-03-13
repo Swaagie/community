@@ -1,5 +1,5 @@
 ###
-Copyright (c) 2002-2011 "Neo Technology,"
+Copyright (c) 2002-2012 "Neo Technology,"
 Network Engine for Objects in Lund AB [http://neotechnology.com]
 
 This file is part of Neo4j.
@@ -20,12 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 define(
   ['neo4j/webadmin/utils/ItemUrlResolver'
-   './Property','lib/backbone'], 
-  (ItemUrlResolver, Property) ->
+   './Property'
+   'ribcage/Model'], 
+  (ItemUrlResolver, Property, Model) ->
   
     ID_COUNTER = 0
 
-    class PropertyContainer extends Backbone.Model
+    class PropertyContainer extends Model
       
       defaults :
         status : "saved"

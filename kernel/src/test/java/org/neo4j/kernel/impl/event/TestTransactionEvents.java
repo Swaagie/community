@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -309,11 +309,11 @@ public class TestTransactionEvents extends AbstractNeo4jTestCase
         MyTxEventHandler handler = new MyTxEventHandler(); 
         getGraphDb().registerTransactionEventHandler( handler );
         newTransaction();
-        getEmbeddedGraphDb().getConfig().getGraphDbModule().getNodeManager().clearCache();
+        getEmbeddedGraphDb().getNodeManager().clearCache();
         rel.delete();
         node1.delete();
         node2.delete();
-        getEmbeddedGraphDb().getConfig().getGraphDbModule().getNodeManager().clearCache();
+        getEmbeddedGraphDb().getNodeManager().clearCache();
         commit();
         assertEquals( "stringvalue", handler.nodeProps.get( "test1" ) );
         assertEquals( "stringvalue", handler.relProps.get( "test1" ) );

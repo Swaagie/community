@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -25,15 +25,19 @@ import java.lang.management.OperatingSystemMXBean;
 import java.lang.reflect.Method;
 import java.util.Map;
 
+import org.neo4j.kernel.impl.nioneo.store.FileSystemAbstraction;
+
 public class AutoConfigurator
 {
     private final int totalPhysicalMemMb;
     private final int maxVmUsageMb;
     private final String dbPath;
     private final boolean useMemoryMapped;
+    private final FileSystemAbstraction fs;
 
-    public AutoConfigurator( String dbPath, boolean useMemoryMapped, boolean dump )
+    public AutoConfigurator( FileSystemAbstraction fs, String dbPath, boolean useMemoryMapped, boolean dump )
     {
+        this.fs = fs;
         this.dbPath = dbPath;
         this.useMemoryMapped = useMemoryMapped;
         OperatingSystemMXBean osBean =
@@ -42,7 +46,7 @@ public class AutoConfigurator
         try
         {
             Class<?> beanClass =
-                Class.forName( "com.sun.management.OperatingSystemMXBean" );
+                Thread.currentThread().getContextClassLoader().loadClass( "com.sun.management.OperatingSystemMXBean" );
             Method method = beanClass.getMethod( "getTotalPhysicalMemorySize" );
             mem = (Long) method.invoke( osBean );
         }
@@ -73,7 +77,7 @@ public class AutoConfigurator
         return "Physical mem: " + totalPhysicalMemMb + "MB, Heap size: " + maxVmUsageMb + "MB";
     }
 
-    public void configure( Map<Object,Object> config )
+    public void configure( Map<String, String> config )
     {
         if ( totalPhysicalMemMb > 0 )
         {
@@ -118,7 +122,7 @@ public class AutoConfigurator
         return size;
     }
 
-    private void assignMemory( Map<Object, Object> config, int availableMem )
+    private void assignMemory( Map<String, String> config, int availableMem )
     {
         int nodeStore = getFileSizeMb( "nodestore.db" );
         int relStore = getFileSizeMb( "relationshipstore.db" );
@@ -152,7 +156,7 @@ public class AutoConfigurator
         configPut( config, "propertystore.db.arrays", arrayStore );
     }
 
-    private void configPut( Map<Object, Object> config, String store,
+    private void configPut( Map<String, String> config, String store,
             int size )
     {
         config.put( "neostore." + store + ".mapped_memory", size + "M" );
@@ -160,7 +164,7 @@ public class AutoConfigurator
 
     private int getFileSizeMb( String file )
     {
-        long length = new File( dbPath + File.separator + "neostore." + file ).length();
+        long length = fs.getFileSize( dbPath + File.separator + "neostore." + file );
         int mb = (int) ( length / 1024 / 1024 );
         if ( mb > 0 )
         {

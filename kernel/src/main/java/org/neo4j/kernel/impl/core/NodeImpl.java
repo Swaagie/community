@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,6 +21,7 @@ package org.neo4j.kernel.impl.core;
 
 import static org.neo4j.kernel.impl.util.RelIdArray.empty;
 
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -33,37 +34,26 @@ import org.neo4j.graphdb.NotFoundException;
 import org.neo4j.graphdb.PropertyContainer;
 import org.neo4j.graphdb.Relationship;
 import org.neo4j.graphdb.RelationshipType;
-import org.neo4j.graphdb.ReturnableEvaluator;
-import org.neo4j.graphdb.StopEvaluator;
-import org.neo4j.graphdb.Traverser;
-import org.neo4j.graphdb.Traverser.Order;
 import org.neo4j.helpers.Triplet;
 import org.neo4j.kernel.impl.core.LockReleaser.CowEntityElement;
 import org.neo4j.kernel.impl.core.LockReleaser.PrimitiveElement;
 import org.neo4j.kernel.impl.nioneo.store.PropertyData;
 import org.neo4j.kernel.impl.nioneo.store.Record;
 import org.neo4j.kernel.impl.transaction.LockType;
-import org.neo4j.kernel.impl.traversal.OldTraverserWrapper;
 import org.neo4j.kernel.impl.util.ArrayMap;
 import org.neo4j.kernel.impl.util.CombinedRelIdIterator;
 import org.neo4j.kernel.impl.util.RelIdArray;
 import org.neo4j.kernel.impl.util.RelIdArray.DirectionWrapper;
 import org.neo4j.kernel.impl.util.RelIdIterator;
 
-class NodeImpl extends ArrayBasedPrimitive
+public class NodeImpl extends ArrayBasedPrimitive
 {
-    private static final long TWO_POWER_36 = (long) Math.pow( 2, 36 )-1;
     private static final RelIdArray[] NO_RELATIONSHIPS = new RelIdArray[0];
 
     private volatile RelIdArray[] relationships;
-    
-    // [    ,    ][    ,    ][    ,xxxx][xxxx,    ][    ,    ][    ,    ][    ,    ][    ,    ]: high bits of first prop (0xFF000000000)
-    // [    ,    ][    ,    ][    ,    ][    ,xxxx][xxxx,xxxx][xxxx,xxxx][xxxx,xxxx][xxxx,xxxx]: rel chain position (0xFFFFFFFFF)
-    private long relChainPositionAndMore;
-    
-    // [xxxx,xxxx][xxxx,xxxx][xxxx,xxxx][xxxx,    ][    ,    ][    ,    ][    ,    ][    ,    ]: low bits of first prop (0xFFFFFFF000000000)
-    // [    ,    ][    ,    ][    ,    ][    ,xxxx][xxxx,xxxx][xxxx,xxxx][xxxx,xxxx][xxxx,xxxx]: id (0xFFFFFFFFF)
-    private long idAndMore;
+
+    private long relChainPosition = Record.NO_NEXT_RELATIONSHIP.intValue();
+    private final long id;
 
     NodeImpl( long id, long firstRel, long firstProp )
     {
@@ -73,30 +63,18 @@ class NodeImpl extends ArrayBasedPrimitive
     // newNode will only be true for NodeManager.createNode
     NodeImpl( long id, long firstRel, long firstProp, boolean newNode )
     {
+        /* TODO firstRel/firstProp isn't used yet due to some unresolved issue with clearing
+         * of cache and keeping those first ids in the node instead of loading on demand.
+         */
         super( newNode );
-        idAndMore = id;
-        relChainPositionAndMore = firstRel & 0xFFFFFFFFFL;
-        setFirstProp( firstProp );
+        this.id = id;
         if ( newNode ) relationships = NO_RELATIONSHIPS;
     }
 
     @Override
     public long getId()
     {
-        return idAndMore & 0xFFFFFFFFFL;
-    }
-    
-    @Override
-    protected long getFirstProp()
-    {
-        long prop = ((idAndMore & 0xFFFFFFF000000000L) >>> 36) | ((relChainPositionAndMore & 0xFF000000000L) >>> 8);
-        return prop == TWO_POWER_36 ? Record.NO_NEXT_PROPERTY.intValue() : prop;
-    }
-    
-    private void setFirstProp( long prop )
-    {
-        idAndMore = ((prop & 0xFFFFFFF) << 36) | (idAndMore & 0xFFFFFFFFFL);
-        relChainPositionAndMore = ((prop & 0xFF0000000L) << 8) | (relChainPositionAndMore & 0xFFFFFFFFFL); 
+        return id;
     }
 
     @Override
@@ -136,7 +114,7 @@ class NodeImpl extends ArrayBasedPrimitive
     protected ArrayMap<Integer, PropertyData> loadProperties(
             NodeManager nodeManager, boolean light )
     {
-        return nodeManager.loadProperties( this, getFirstProp(), light );
+        return nodeManager.loadProperties( this, light );
     }
 
     List<RelIdIterator> getAllRelationships( NodeManager nodeManager, DirectionWrapper direction )
@@ -353,7 +331,8 @@ class NodeImpl extends ArrayBasedPrimitive
         synchronized ( this )
         {
             if ( relationships == null )
-            {   // We got the relChainPosition in the constructor
+            {
+                relChainPosition = nodeManager.getRelationshipChainPosition( this );
                 ArrayMap<String,RelIdArray> tmpRelMap = new ArrayMap<String,RelIdArray>();
                 rels = getMoreRelationships( nodeManager, tmpRelMap );
                 this.relationships = toRelIdArray( tmpRelMap );
@@ -489,26 +468,24 @@ class NodeImpl extends ArrayBasedPrimitive
 
     private void putRelIdArray( RelIdArray addRels )
     {
-        // Try to overwrite it if it's already set
-        //
-        // Make sure the same array is looped all the way through, that's why
-        // a safe reference is kept to it. If the real array has changed when
-        // we're about to set it then redo the loop. A kind of lock-free synchronization
+        // precondition: called under synchronization
 
+        // make a local reference to the array to avoid multiple read barrier hits
+        RelIdArray[] array = relationships;
+        // Try to overwrite it if it's already set
         String expectedType = addRels.getType();
-        for ( int i = 0; i < relationships.length; i++ )
+        for ( int i = 0; i < array.length; i++ )
         {
-            if ( relationships[i].getType().equals( expectedType ) )
+            if ( array[i].getType().equals( expectedType ) )
             {
-                relationships[i] = addRels;
+                array[i] = addRels;
                 return;
             }
         }
-
-        RelIdArray[] newArray = new RelIdArray[relationships.length+1];
-        System.arraycopy( relationships, 0, newArray, 0, relationships.length );
-        newArray[relationships.length] = addRels;
-        relationships = newArray;
+        // no previous entry of the given type - extend the array
+        array = Arrays.copyOf( array, array.length + 1 );
+        array[array.length - 1] = addRels;
+        relationships = array;
     }
 
     public Relationship createRelationshipTo( NodeManager nodeManager, Node thisProxy,
@@ -546,35 +523,6 @@ class NodeImpl extends ArrayBasedPrimitive
     }
     */
 
-    public Traverser traverse( NodeManager nodeManager, Order traversalOrder,
-        StopEvaluator stopEvaluator, ReturnableEvaluator returnableEvaluator,
-        RelationshipType relationshipType, Direction direction )
-    {
-        return OldTraverserWrapper.traverse( new NodeProxy( getId(), nodeManager ),
-                traversalOrder, stopEvaluator,
-                returnableEvaluator, relationshipType, direction );
-    }
-
-    public Traverser traverse( NodeManager nodeManager, Order traversalOrder,
-        StopEvaluator stopEvaluator, ReturnableEvaluator returnableEvaluator,
-        RelationshipType firstRelationshipType, Direction firstDirection,
-        RelationshipType secondRelationshipType, Direction secondDirection )
-    {
-        return OldTraverserWrapper.traverse( new NodeProxy( getId(), nodeManager ),
-                traversalOrder, stopEvaluator,
-                returnableEvaluator, firstRelationshipType, firstDirection,
-                secondRelationshipType, secondDirection );
-    }
-
-    public Traverser traverse( NodeManager nodeManager, Order traversalOrder,
-        StopEvaluator stopEvaluator, ReturnableEvaluator returnableEvaluator,
-        Object... relationshipTypesAndDirections )
-    {
-        return OldTraverserWrapper.traverse( new NodeProxy( getId(), nodeManager ),
-                traversalOrder, stopEvaluator,
-                returnableEvaluator, relationshipTypesAndDirections );
-    }
-
     public boolean hasRelationship( NodeManager nodeManager )
     {
         return getRelationships( nodeManager ).iterator().hasNext();
@@ -600,14 +548,6 @@ class NodeImpl extends ArrayBasedPrimitive
     {
         return getRelationships( nodeManager, type, dir ).iterator().hasNext();
     }
-    
-    @Override
-    protected void commitPropertyMaps( ArrayMap<Integer, PropertyData> cowPropertyAddMap,
-            ArrayMap<Integer, PropertyData> cowPropertyRemoveMap, long firstProp )
-    {
-        super.commitPropertyMaps( cowPropertyAddMap, cowPropertyRemoveMap, firstProp );
-        setFirstProp( firstProp );
-    }
 
     protected void commitRelationshipMaps(
         ArrayMap<String,RelIdArray> cowRelationshipAddMap,
@@ -616,7 +556,6 @@ class NodeImpl extends ArrayBasedPrimitive
         if ( relationships == null )
         {
             // we will load full in some other tx
-            setRelChainPosition( firstRel );
             return;
         }
 
@@ -658,19 +597,20 @@ class NodeImpl extends ArrayBasedPrimitive
 
     long getRelChainPosition()
     {
-        long position = relChainPositionAndMore & 0xFFFFFFFFFL;
-        return position == TWO_POWER_36 ? Record.NO_NEXT_RELATIONSHIP.intValue() : position;
+        return relChainPosition;
     }
 
     void setRelChainPosition( long position )
-    {
-        relChainPositionAndMore = (relChainPositionAndMore & 0xFFFFFFF000000000L) | (position & 0xFFFFFFFFFL);
-        if ( !hasMoreRelationshipsToLoad() && relationships != null )
+    { // precondition: must be called under synchronization
+        relChainPosition = position;
+        // use local reference to avoid multiple read barriers
+        RelIdArray[] array = relationships;
+        if ( !hasMoreRelationshipsToLoad() && array != null )
         {
-            // Shrink arrays
-            for ( int i = 0; i < relationships.length; i++ )
+            // Done loading - Shrink arrays
+            for ( int i = 0; i < array.length; i++ )
             {
-                relationships[i] = relationships[i].shrink();
+                array[i] = array[i].shrink();
             }
         }
     }
@@ -684,7 +624,7 @@ class NodeImpl extends ArrayBasedPrimitive
     {
         return relationships;
     }
-    
+
     @Override
     public CowEntityElement getEntityElement( PrimitiveElement element, boolean create )
     {
@@ -694,6 +634,6 @@ class NodeImpl extends ArrayBasedPrimitive
     @Override
     PropertyContainer asProxy( NodeManager nm )
     {
-        return new NodeProxy( getId(), nm );
+        return nm.newNodeProxyById(getId());
     }
 }

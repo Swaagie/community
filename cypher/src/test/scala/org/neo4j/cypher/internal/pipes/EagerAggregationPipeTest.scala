@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -23,29 +23,29 @@ import org.junit.Test
 import org.junit.Assert._
 import org.junit.matchers.JUnitMatchers._
 import scala.collection.JavaConverters._
-import org.neo4j.cypher.commands._
+import org.neo4j.cypher.internal.commands._
 import org.scalatest.junit.JUnitSuite
 import org.neo4j.cypher.SyntaxException
-import org.neo4j.cypher.symbols.{IntegerType, SymbolTable, Identifier, NodeType}
+import org.neo4j.cypher.internal.symbols._
 
 class EagerAggregationPipeTest extends JUnitSuite {
   @Test def shouldReturnColumnsFromReturnItems() {
     val source = new FakePipe(List(), createSymbolTableFor("name"))
 
-    val returnItems = List(ExpressionReturnItem(Entity("name")))
+    val returnItems = List(Entity("name"))
     val grouping = List(CountStar())
     val aggregationPipe = new EagerAggregationPipe(source, returnItems, grouping)
 
     assertEquals(
-      Seq(Identifier("name", NodeType()), Identifier("count(*)", IntegerType())),
+      Seq(Identifier("name", NodeType()), Identifier("count(*)", LongType())),
       aggregationPipe.symbols.identifiers)
   }
 
   @Test(expected = classOf[SyntaxException]) def shouldThrowSemanticException() {
     val source = new FakePipe(List(), createSymbolTableFor("extractReturnItems"))
 
-    val returnItems = List(ExpressionReturnItem(Entity("name")))
-    val grouping = List(ValueAggregationItem(Count(Entity("none-existing-identifier"))))
+    val returnItems = List(Entity("name"))
+    val grouping = List(Count(Entity("none-existing-identifier")))
     new EagerAggregationPipe(source, returnItems, grouping)
   }
 
@@ -56,7 +56,7 @@ class EagerAggregationPipeTest extends JUnitSuite {
       Map("name" -> "Michael", "age" -> 36),
       Map("name" -> "Michael", "age" -> 31)), createSymbolTableFor("name"))
 
-    val returnItems = List(ExpressionReturnItem(Entity("name")))
+    val returnItems = List(Entity("name"))
     val grouping = List(CountStar())
     val aggregationPipe = new EagerAggregationPipe(source, returnItems, grouping)
 
@@ -74,7 +74,7 @@ class EagerAggregationPipeTest extends JUnitSuite {
       Map("name" -> "Michael", "age" -> 31)), createSymbolTableFor("name"))
 
     val returnItems = List()
-    val grouping = List(ValueAggregationItem(Count((Entity("name")))))
+    val grouping = List(Count(Entity("name")))
     val aggregationPipe = new EagerAggregationPipe(source, returnItems, grouping)
 
     assertEquals(List(Map("count(name)" -> 3)), aggregationPipe.createResults(Map()).toList)

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -18,6 +18,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 package org.neo4j.kernel.impl.transaction.xaframework;
+
+import java.util.TimeZone;
 
 import javax.transaction.xa.Xid;
 
@@ -48,6 +50,11 @@ public abstract class LogEntry
     public int getIdentifier()
     {
         return identifier;
+    }
+    
+    public String toString( TimeZone timeZone )
+    {
+        return toString();
     }
 
     public static class Start extends LogEntry
@@ -93,18 +100,35 @@ public abstract class LogEntry
             this.startPosition = position;
         }
         
-        public long getTimeWritten()
+        long getTimeWritten()
         {
             return timeWritten;
+        }
+        
+        /**
+         * @return combines necessary state to get a unique checksum to identify this transaction uniquely.
+         */
+        public long getChecksum()
+        {
+            // [4 bits combined masterId/myId][4 bits xid hashcode, which combines time/randomness]
+            long lowBits = xid.hashCode();
+            long highBits = masterId*37 + myId;
+            return (highBits << 32) | (lowBits & 0xFFFFFFFFL);
         }
 
         @Override
         public String toString()
         {
-            return "Start[" + getIdentifier() + ",xid=" + xid + ",master=" + masterId + ",me=" + myId + ",time=" + timestamp( timeWritten ) + "]";
+            return toString( Format.DEFAULT_TIME_ZONE );
+        }
+        
+        @Override
+        public String toString( TimeZone timeZone )
+        {
+            return "Start[" + getIdentifier() + ",xid=" + xid + ",master=" + masterId + ",me=" + myId + ",time=" + timestamp( timeWritten, timeZone ) + "]";
         }
     }
-
+    
     static class Prepare extends LogEntry
     {
         private final long timeWritten;
@@ -123,7 +147,13 @@ public abstract class LogEntry
         @Override
         public String toString()
         {
-            return "Prepare[" + getIdentifier() + ", " + timestamp( timeWritten ) + "]";
+            return toString( Format.DEFAULT_TIME_ZONE );
+        }
+        
+        @Override
+        public String toString( TimeZone timeZone )
+        {
+            return "Prepare[" + getIdentifier() + ", " + timestamp( timeWritten, timeZone ) + "]";
         }
     }
 
@@ -131,12 +161,14 @@ public abstract class LogEntry
     {
         private final long txId;
         private final long timeWritten;
+        protected final String name;
 
-        Commit( int identifier, long txId, long timeWritten )
+        Commit( int identifier, long txId, long timeWritten, String name )
         {
             super( identifier );
             this.txId = txId;
             this.timeWritten = timeWritten;
+            this.name = name;
         }
 
         public long getTxId()
@@ -148,19 +180,33 @@ public abstract class LogEntry
         {
             return timeWritten;
         }
+        
+        @Override
+        public String toString()
+        {
+            return toString( Format.DEFAULT_TIME_ZONE );
+        }
+        
+        @Override
+        public String toString( TimeZone timeZone )
+        {
+            return name + "[" + getIdentifier() + ", txId=" + getTxId() + ", " + timestamp( getTimeWritten(), timeZone ) + "]";
+        }
     }
 
     public static class OnePhaseCommit extends Commit
     {
         OnePhaseCommit( int identifier, long txId, long timeWritten )
         {
-            super( identifier, txId, timeWritten );
+            super( identifier, txId, timeWritten, "1PC" );
         }
+    }
 
-        @Override
-        public String toString()
+    public static class TwoPhaseCommit extends Commit
+    {
+        TwoPhaseCommit( int identifier, long txId, long timeWritten )
         {
-            return "1PC[" + getIdentifier() + ", txId=" + getTxId() + ", " + timestamp( getTimeWritten() ) + "]";
+            super( identifier, txId, timeWritten, "2PC" );
         }
     }
 
@@ -177,21 +223,7 @@ public abstract class LogEntry
             return "Done[" + getIdentifier() + "]";
         }
     }
-
-    public static class TwoPhaseCommit extends Commit
-    {
-        TwoPhaseCommit( int identifier, long txId, long timeWritten )
-        {
-            super( identifier, txId, timeWritten );
-        }
-
-        @Override
-        public String toString()
-        {
-            return "2PC[" + getIdentifier() + ", txId=" + getTxId() + ", " + timestamp( getTimeWritten() ) + "]";
-        }
-    }
-
+    
     public static class Command extends LogEntry
     {
         private final XaCommand command;
@@ -219,8 +251,8 @@ public abstract class LogEntry
         identifier = newXidIdentifier;
     }
 
-    public String timestamp( long timeWritten )
+    public String timestamp( long timeWritten, TimeZone timeZone )
     {
-        return Format.date( timeWritten ) + "/" + timeWritten;
+        return Format.date( timeWritten, timeZone ) + "/" + timeWritten;
     }
 }

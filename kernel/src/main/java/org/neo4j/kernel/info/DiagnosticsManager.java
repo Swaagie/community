@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -27,10 +27,11 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.neo4j.helpers.collection.IterableWrapper;
 import org.neo4j.helpers.collection.Visitor;
+import org.neo4j.kernel.Lifecycle;
 import org.neo4j.kernel.impl.util.StringLogger;
 import org.neo4j.kernel.info.DiagnosticsExtractor.VisitableDiagnostics;
 
-public final class DiagnosticsManager implements Iterable<DiagnosticsProvider>
+public final class DiagnosticsManager implements Iterable<DiagnosticsProvider>, Lifecycle
 {
     @SuppressWarnings( "unchecked" )
     public static final <T> Visitor<? super T> castToGenericVisitor( Class<T> type, Object visitor )
@@ -104,6 +105,39 @@ public final class DiagnosticsManager implements Iterable<DiagnosticsProvider>
         SystemDiagnostics.registerWith( this );
     }
 
+    @Override
+    public void init()
+        throws Throwable
+    {
+    }
+
+    public void start()
+    {
+        synchronized ( providers )
+        {
+            @SuppressWarnings( "hiding" ) State state = this.state;
+            if ( !state.startup( this ) ) return;
+        }
+        dumpAll( DiagnosticsPhase.STARTUP );
+    }
+
+    @Override
+    public void stop()
+        throws Throwable
+    {
+    }
+
+    public void shutdown()
+    {
+        synchronized ( providers )
+        {
+            @SuppressWarnings( "hiding" ) State state = this.state;
+            if ( !state.shutdown( this ) ) return;
+        }
+        dumpAll( DiagnosticsPhase.SHUTDOWN );
+        providers.clear();
+    }
+
     private enum State
     {
         INITIAL
@@ -136,31 +170,10 @@ public final class DiagnosticsManager implements Iterable<DiagnosticsProvider>
             return true;
         }
     }
-    
+
     public StringLogger getTargetLog()
     {
         return logger;
-    }
-
-    public void startup()
-    {
-        synchronized ( providers )
-        {
-            @SuppressWarnings( "hiding" ) State state = this.state;
-            if ( !state.startup( this ) ) return;
-        }
-        dumpAll( DiagnosticsPhase.STARTUP );
-    }
-
-    public void shutdown()
-    {
-        synchronized ( providers )
-        {
-            @SuppressWarnings( "hiding" ) State state = this.state;
-            if ( !state.shutdown( this ) ) return;
-        }
-        dumpAll( DiagnosticsPhase.SHUTDOWN );
-        providers.clear();
     }
 
     public void dumpAll()
@@ -179,7 +192,7 @@ public final class DiagnosticsManager implements Iterable<DiagnosticsProvider>
         {
             if ( identifier.equals( provider.getDiagnosticsIdentifier() ) )
             {
-                provider.dump( DiagnosticsPhase.EXPLICIT, log );
+                dump( provider, DiagnosticsPhase.EXPLICIT, log );
                 return;
             }
         }
@@ -198,7 +211,7 @@ public final class DiagnosticsManager implements Iterable<DiagnosticsProvider>
         phase.emitStart( logger );
         for ( DiagnosticsProvider provider : providers )
         {
-            provider.dump( phase, logger );
+            dump( provider, phase, logger );
         }
         phase.emitDone( logger );
     }
@@ -235,8 +248,20 @@ public final class DiagnosticsManager implements Iterable<DiagnosticsProvider>
     private void dump( DiagnosticsPhase phase, DiagnosticsProvider provider )
     {
         phase.emitStart( logger, provider );
-        provider.dump( phase, logger );
+        dump( provider, phase, logger );
         phase.emitDone( logger, provider );
+    }
+
+    private static void dump( DiagnosticsProvider provider, DiagnosticsPhase phase, StringLogger logger )
+    {
+        try
+        {
+            provider.dump( phase, logger );
+        }
+        catch ( Exception cause )
+        {
+            logger.logMessage( "Failure while logging diagnostics for " + provider, cause );
+        }
     }
 
     @Override

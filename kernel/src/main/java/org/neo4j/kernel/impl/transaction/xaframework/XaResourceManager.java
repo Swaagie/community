@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -38,6 +38,7 @@ import javax.transaction.xa.XAResource;
 import javax.transaction.xa.Xid;
 
 import org.neo4j.kernel.impl.transaction.AbstractTransactionManager;
+import org.neo4j.kernel.impl.transaction.xaframework.LogEntry.Start;
 import org.neo4j.kernel.impl.util.ArrayMap;
 import org.neo4j.kernel.impl.util.StringLogger;
 
@@ -49,7 +50,7 @@ public class XaResourceManager
     private final ArrayMap<Xid,XidStatus> xidMap =
         new ArrayMap<Xid,XidStatus>();
     private int recoveredTxCount = 0;
-    private Set<TransactionInfo> recoveredDoneRecords = new HashSet<TransactionInfo>();
+    private final Set<TransactionInfo> recoveredTransactions = new HashSet<TransactionInfo>();
 
     private XaLogicalLog log = null;
     private final XaTransactionFactory tf;
@@ -58,18 +59,21 @@ public class XaResourceManager
     private final XaDataSource dataSource;
     private StringLogger msgLog;
     private final AbstractTransactionManager transactionManager;
+    private final RecoveryVerifier recoveryVerifier;
 
-    XaResourceManager( XaDataSource dataSource, XaTransactionFactory tf,
-            TxIdGenerator txIdGenerator, AbstractTransactionManager transactionManager, String name )
+    public XaResourceManager( XaDataSource dataSource, XaTransactionFactory tf,
+            TxIdGenerator txIdGenerator, AbstractTransactionManager transactionManager,
+            RecoveryVerifier recoveryVerifier, String name )
     {
         this.dataSource = dataSource;
         this.tf = tf;
         this.txIdGenerator = txIdGenerator;
         this.transactionManager = transactionManager;
+        this.recoveryVerifier = recoveryVerifier;
         this.name = name;
     }
 
-    synchronized void setLogicalLog( XaLogicalLog log )
+    public synchronized void setLogicalLog( XaLogicalLog log )
     {
         this.log = log;
         if ( log != null )
@@ -211,7 +215,7 @@ public class XaResourceManager
     private static class XidStatus
     {
         private boolean active = true;
-        private TransactionStatus txStatus;
+        private final TransactionStatus txStatus;
 
         XidStatus( XaTransaction xaTransaction )
         {
@@ -363,7 +367,7 @@ public class XaResourceManager
         }
     }
 
-    private Map<Xid,Integer> txOrderMap = new HashMap<Xid,Integer>();
+    private final Map<Xid,Integer> txOrderMap = new HashMap<Xid,Integer>();
     private int nextTxOrder = 0;
 
     // called during recovery
@@ -478,8 +482,9 @@ public class XaResourceManager
         else if ( !log.scanIsComplete() || recoveredTxCount > 0 )
         {
             int identifier = xaTransaction.getIdentifier();
-            recoveredDoneRecords.add( new TransactionInfo( identifier, onePhase,
-                    xaTransaction.getCommitTxId() ) );
+            Start startEntry = log.getStartEntry( identifier );
+            recoveredTransactions.add( new TransactionInfo( identifier, onePhase,
+                    xaTransaction.getCommitTxId(), startEntry.getMasterId(), startEntry.getChecksum() ) );
         }
         xidMap.remove( xid );
         if ( xaTransaction.isRecovered() )
@@ -576,7 +581,7 @@ public class XaResourceManager
         xidMap.remove( xid );
         if ( xaTransaction.isRecovered() )
         {
-            recoveredDoneRecords.remove( xaTransaction.getIdentifier() );
+            recoveredTransactions.remove( xaTransaction.getIdentifier() );
             recoveredTxCount--;
             checkIfRecoveryComplete();
         }
@@ -668,7 +673,7 @@ public class XaResourceManager
         }
         checkIfRecoveryComplete();
     }
-
+    
     private void checkIfRecoveryComplete()
     {
         if ( log.scanIsComplete() && recoveredTxCount == 0 )
@@ -678,15 +683,20 @@ public class XaResourceManager
             tf.recoveryComplete();
             try
             {
-                for ( TransactionInfo recoveredTx : recoveredDoneRecords )
+                for ( TransactionInfo recoveredTx : sortByTxId( recoveredTransactions ) )
                 {
+                    if ( recoveryVerifier != null && !recoveryVerifier.isValid( recoveredTx ) )
+                    {
+                        throw new RecoveryVerificationException( recoveredTx.getIdentifier(), recoveredTx.getTxId() );
+                    }
+                    
                     if ( !recoveredTx.isOnePhase() )
                     {
                         log.commitTwoPhase( recoveredTx.getIdentifier(), recoveredTx.getTxId(), ForceMode.forced );
                     }
                     log.doneInternal( recoveredTx.getIdentifier() );
                 }
-                recoveredDoneRecords.clear();
+                recoveredTransactions.clear();
             }
             catch ( IOException e )
             {
@@ -700,6 +710,13 @@ public class XaResourceManager
             }
             msgLog.logMessage( "XaResourceManager[" + name + "] recovery completed." );
         }
+    }
+
+    private Iterable<TransactionInfo> sortByTxId( Set<TransactionInfo> set )
+    {
+        List<TransactionInfo> list = new ArrayList<TransactionInfo>( set );
+        Collections.sort( list );
+        return list;
     }
 
     // for testing, do not use!
@@ -742,8 +759,7 @@ public class XaResourceManager
             ReadableByteChannel transaction ) throws IOException
     {
         long txId = TxIdGenerator.DEFAULT.generate( dataSource, 0 );
-        int masterId = txIdGenerator.getCurrentMasterId();
-        log.applyTransactionWithoutTxId( transaction, txId, masterId, getForceMode() );
+        log.applyTransactionWithoutTxId( transaction, txId, getForceMode() );
         return txId;
     }
 

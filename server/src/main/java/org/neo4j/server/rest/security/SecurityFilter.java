@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -30,18 +30,14 @@ import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.neo4j.graphdb.GraphDatabaseService;
-
 public class SecurityFilter implements Filter
 {
 
     private final SecurityRule rule;
-    private final GraphDatabaseService graph;
 
-    public SecurityFilter( SecurityRule rule, GraphDatabaseService graph )
+    public SecurityFilter( SecurityRule rule )
     {
         this.rule = rule;
-        this.graph = graph;
     }
 
     @Override
@@ -57,7 +53,7 @@ public class SecurityFilter implements Filter
         validateRequestType( request );
         validateResponseType( response );
 
-        if ( rule.isAuthorized( (HttpServletRequest) request, graph ) )
+        if ( rule.isAuthorized( (HttpServletRequest) request ) )
         {
             chain.doFilter( request, response );
         }

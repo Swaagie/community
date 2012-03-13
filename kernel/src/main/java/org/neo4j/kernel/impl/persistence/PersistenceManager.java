@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -55,10 +55,10 @@ public class PersistenceManager
 
     private final PersistenceSource persistenceSource;
     private final TransactionManager transactionManager;
-    private final LockReleaser lockReleaser;
+    private LockReleaser lockReleaser;
 
     private final ArrayMap<Transaction,NeoStoreTransaction> txConnectionMap =
-        new ArrayMap<Transaction,NeoStoreTransaction>( 5, true, true );
+        new ArrayMap<Transaction,NeoStoreTransaction>( (byte)5, true, true );
 
     private final TxEventSyncHookFactory syncHookFactory;
 
@@ -72,9 +72,9 @@ public class PersistenceManager
         this.lockReleaser = lockReleaser;
     }
 
-    public PersistenceSource getPersistenceSource()
+    public void setLockReleaser(LockReleaser lockReleaser)
     {
-        return persistenceSource;
+        this.lockReleaser = lockReleaser;
     }
 
     public NodeRecord loadLightNode( long id )
@@ -108,10 +108,9 @@ public class PersistenceManager
         return getReadOnlyResource().getMoreRelationships( nodeId, position );
     }
 
-    public ArrayMap<Integer,PropertyData> loadNodeProperties( long nodeId, long firstProp,
-            boolean light )
+    public ArrayMap<Integer,PropertyData> loadNodeProperties( long nodeId, boolean light )
     {
-        return getReadOnlyResourceIfPossible().nodeLoadProperties( nodeId, firstProp, light );
+        return getReadOnlyResourceIfPossible().nodeLoadProperties( nodeId, light );
     }
 
     public ArrayMap<Integer,PropertyData> loadRelProperties( long relId,
@@ -378,7 +377,7 @@ public class PersistenceManager
         {
             try
             {
-                tx.delistResource( con.getXAResource(), XAResource.TMSUCCESS );
+                con.delistResource(tx, XAResource.TMSUCCESS);
             }
             catch ( SystemException e )
             {

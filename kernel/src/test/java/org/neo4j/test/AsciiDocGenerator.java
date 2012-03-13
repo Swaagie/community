@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
 import java.io.Writer;
 import java.util.HashMap;
 import java.util.Map;
@@ -50,8 +51,6 @@ public abstract class AsciiDocGenerator
     protected GraphDatabaseService graph;
     protected static final String SNIPPET_MARKER = "@@";
     protected Map<String, String> snippets = new HashMap<String, String>();
-
-    public File out;
 
     public AsciiDocGenerator( final String title, final String section )
     {
@@ -118,7 +117,7 @@ public abstract class AsciiDocGenerator
         fw.append( "\n" );
     }
 
-    public Writer getFW(String dir, String title)
+    public static Writer getFW( String dir, String title )
     {
         try 
         {
@@ -127,9 +126,8 @@ public abstract class AsciiDocGenerator
             {
                 dirs.mkdirs();
             }
-            String name = title.replace( " ", "-" )
-                    .toLowerCase();
-            out = new File( dirs, name + ".txt" );
+            String name = title.replace( " ", "-" ).toLowerCase();
+            File out = new File( dirs, name + ".txt" );
             if ( out.exists() )
             {
                 out.delete();
@@ -138,30 +136,28 @@ public abstract class AsciiDocGenerator
             {
                 throw new RuntimeException( "File exists: " + out.getAbsolutePath() );
             }
-
             return new OutputStreamWriter( new FileOutputStream( out, false ),
                     "UTF-8" );
-        } catch (Exception e)
+        }
+        catch ( Exception e )
         {
             e.printStackTrace();
             throw new RuntimeException(e);
         }
     }
-    
-    public static String createSourceSnippet( String tagName, Class<?> source )
-    {
-        return "[snippet,java]\n" + "----\n"
-               + "component=${project.artifactId}\n" + "source="
-               + getPath( source ) + "\n" + "classifier=test-sources\n"
-               + "tag=" + tagName + "\n" + "----\n";
-    }
 
+    public static PrintWriter getPrintWriter( String dir, String title )
+    {
+        return new PrintWriter( getFW( dir, title ) );
+    }
+    
     public static String getPath( Class<?> source )
     {
         return source.getPackage()
                 .getName()
                 .replace( ".", "/" ) + "/" + source.getSimpleName() + ".java";
     }
+
     protected String replaceSnippets( String description )
     {
         for (String key : snippets.keySet()) {
@@ -204,7 +200,25 @@ public abstract class AsciiDocGenerator
     }
 
     /**
+     * Added one or more source snippets from test sources, available from
+     * javadoc using
+     * 
+     * @@tagName.
+     * 
+     * @param source the class where the snippet is found
+     * @param tagNames the tag names which should be included
+     */
+    public void addTestSourceSnippets( Class<?> source, String... tagNames )
+    {
+        for ( String tagName : tagNames )
+        {
+            addSnippet( tagName, sourceSnippet( tagName, source, "test-sources" ) );
+        }
+    }
+
+    /**
      * Added one or more source snippets, available from javadoc using
+     * 
      * @@tagName.
      * 
      * @param source the class where the snippet is found
@@ -214,12 +228,34 @@ public abstract class AsciiDocGenerator
     {
         for ( String tagName : tagNames )
         {
-            addSnippet( tagName, createSourceSnippet( tagName, source ) );
+            addSnippet( tagName, sourceSnippet( tagName, source, "sources" ) );
         }
     }
 
-    public void addGithubLink( String key, Class<?> source, String repo,
+    private static String sourceSnippet( String tagName, Class<?> source,
+            String classifier )
+    {
+        return "[snippet,java]\n" + "----\n"
+               + "component=${project.artifactId}\n" + "source="
+               + getPath( source ) + "\n" + "classifier=" + classifier + "\n"
+               + "tag=" + tagName + "\n" + "----\n";
+    }
+
+    public void addGithubTestSourceLink( String key, Class<?> source,
+            String repo,
             String dir )
+    {
+        githubLink( key, source, repo, dir, "test" );
+    }
+
+    public void addGithubSourceLink( String key, Class<?> source, String repo,
+            String dir )
+    {
+        githubLink( key, source, repo, dir, "main" );
+    }
+
+    private void githubLink( String key, Class<?> source, String repo,
+            String dir, String mainOrTest )
     {
         String path = "https://github.com/" + repo
                          + "/blob/{neo4j-git-tag}/";
@@ -227,7 +263,7 @@ public abstract class AsciiDocGenerator
         {
             path += dir + "/";
         }
-        path += "src/test/java/" + getPath( source );
+        path += "src/" + mainOrTest + "/java/" + getPath( source );
         path += "[" + source.getSimpleName() + ".java]\n";
         addSnippet( key, path );
     }

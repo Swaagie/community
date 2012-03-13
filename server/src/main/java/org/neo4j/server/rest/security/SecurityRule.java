@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,7 +21,6 @@ package org.neo4j.server.rest.security;
 
 import javax.servlet.http.HttpServletRequest;
 
-import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.server.configuration.Configurator;
 
 public interface SecurityRule
@@ -33,13 +32,24 @@ public interface SecurityRule
      * @return <code>true</code> if the rule passes, <code>false</code> if the
      *         rule fails and the request is to be rejected.
      */
-    boolean isAuthorized( HttpServletRequest request, GraphDatabaseService graph );
+    boolean isAuthorized(HttpServletRequest request);
 
     /**
      * @return the root of the URI path from which rules will be valid, e.g.
      *         <code>/db/data</code> will apply this rule to everything below
      *         the path <code>/db/data</code>
+     *         It is possible to use * as a wildcard character in return values, e.g.
+     *         <code>/myExtension*</code> will extend security coverage to everything
+     *         under the <code>/myExtension</code> path. Similarly more complex path
+     *         behavior can be specified with more wildcards, e.g.:
+     *         <code>/myExtension*myApplication*specialResources</code>.
+     *         Note that the wildcard represents any character (including the '/' character),
+     *         meaning <code>/myExtension/*</code> is not the same as <code>/myExtension*</code>
+     *         and implementers should take care to ensure their implmentations are tested accordingly.
+     *         <p/>
+     *         Final note: the only wildcard supported is '*' and there is no support for regular expression syntax.
      */
+
     String forUriPath();
 
     /**

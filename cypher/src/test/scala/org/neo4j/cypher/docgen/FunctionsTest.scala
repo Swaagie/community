@@ -1,7 +1,5 @@
-package org.neo4j.cypher.docgen
-
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,11 +17,13 @@ package org.neo4j.cypher.docgen
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+package org.neo4j.cypher.docgen
 
 import org.junit.Test
 import org.junit.Assert._
 import org.neo4j.graphdb.Node
 import org.neo4j.cypher.ExecutionResult
+import collection.mutable.WrappedArray
 
 class FunctionsTest extends DocumentingTestBase {
   def graphDescription = List("A KNOWS B", "A KNOWS C", "B KNOWS D", "C KNOWS D", "B MARRIED E")
@@ -97,7 +97,7 @@ class FunctionsTest extends DocumentingTestBase {
       text = """Returns a string representation of the relationship type.""",
       queryText = """start n=node(%A%) match (n)-[r]->() return type(r)""",
       returns = """The relationship type of r.""",
-      assertions = (p) => assertEquals("KNOWS", p.columnAs[String]("TYPE(r)").toList.head))
+      assertions = (p) => assertEquals("KNOWS", p.columnAs[String]("type(r)").toList.head))
   }
 
   @Test def length() {
@@ -108,7 +108,7 @@ class FunctionsTest extends DocumentingTestBase {
       text = """To return or filter on the length of a path, use the special property LENGTH""",
       queryText = """start a=node(%A%) match p=a-->b-->c return length(p)""",
       returns = """The length of the path p.""",
-      assertions = (p) => assertEquals(2, p.columnAs[Int]("LENGTH(p)").toList.head))
+      assertions = (p) => assertEquals(2, p.columnAs[Int]("length(p)").toList.head))
   }
 
   @Test def extract() {
@@ -125,7 +125,63 @@ class FunctionsTest extends DocumentingTestBase {
  in an iterable with these values. It works like the `map` method in functional languages such as Lisp and Scala.""",
       queryText = """start a=node(%A%), b=node(%B%), c=node(%D%) match p=a-->b-->c return extract(n in nodes(p) : n.age)""",
       returns = """The age property of all nodes in the path.""",
-      assertions = (p) => assertEquals(List(Map("extract(n in NODES(p) : n.age)" -> List(38, 25, 54))), p.toList))
+      assertions = (p) => assertEquals(List(Map("extract(n in nodes(p) : n.age)" -> List(38, 25, 54))), p.toList))
+  }
+
+  @Test def head() {
+    testThis(
+      title = "HEAD",
+      syntax = "HEAD( expression )",
+      arguments = List(
+        "expression" -> "This expression should return a collection of some sort."
+      ),
+      text = "HEAD returns the first element in a collection.",
+      queryText = """start a=node(%E%) return a.array, head(a.array)""",
+      returns = "The first node in the path",
+      assertions = (p) => assertEquals(List("one"), p.columnAs[List[_]]("head(a.array)").toList))
+  }
+
+  @Test def last() {
+    testThis(
+      title = "LAST",
+      syntax = "LAST( expression )",
+      arguments = List(
+        "expression" -> "This expression should return a collection of some sort."
+      ),
+      text = "LAST returns the last element in a collection.",
+      queryText = """start a=node(%E%) return a.array, last(a.array)""",
+      returns = "The first node in the path",
+      assertions = (p) => assertEquals(List("three"), p.columnAs[List[_]]("last(a.array)").toList))
+  }
+
+  @Test def tail() {
+    testThis(
+      title = "TAIL",
+      syntax = "TAIL( expression )",
+      arguments = List(
+        "expression" -> "This expression should return a collection of some sort."
+      ),
+      text = "TAIL returns all but the first element in a collection.",
+      queryText = """start a=node(%E%) return a.array, tail(a.array)""",
+      returns = "The first node in the path",
+      assertions = (p) => {
+        val toList = p.columnAs[Array[_]]("tail(a.array)").toList.head
+        assert(toList === Array("two","three"))
+      })
+  }
+
+  @Test def filter() {
+    testThis(
+      title = "FILTER",
+      syntax = "FILTER(identifier in iterable : predicate)",
+      arguments = common_arguments,
+      text = "FILTER returns all the elements in an iterable that comply to a predicate.",
+      queryText = """start a=node(%E%) return a.array, filter(x in a.array : length(x) = 3)""",
+      returns = "The first node in the path",
+      assertions = (p) => {
+        val array = p.columnAs[WrappedArray[_]]("filter(x in a.array : length(x) = 3)").toList.head
+        assert(List("one","two") === array.toList)
+      })
   }
 
   @Test def nodes_in_path() {
@@ -172,10 +228,57 @@ class FunctionsTest extends DocumentingTestBase {
       text = """Returns the first non-null value in the list of expressions passed to it.""",
       queryText = """start a=node(%A%) return coalesce(a.hairColour?, a.eyes?)""",
       returns = """""",
-      assertions = (p) => assert(Seq("brown") === p.columnAs[String]("COALESCE(a.hairColour,a.eyes)").toSeq)
+      assertions = (p) => assert(Seq("brown") === p.columnAs[String]("coalesce(a.hairColour?, a.eyes?)").toSeq)
     )
   }
 
+  @Test def abs() {
+    testThis(
+      title = "ABS",
+      syntax = "ABS( expression )",
+      arguments = List("expression" -> "A numeric expression"),
+      text = "Returns the absolute value of a number",
+      queryText = """start a=node(%A%), c=node(%E%) return a.age, c.age, abs(a.age - c.age)""",
+      returns = "The absolute value of age difference",
+      assertions = (p) => assert(List(Map("abs(a.age - c.age)"->3.0, "a.age"->38, "c.age"->41)) === p.toList)
+    )
+  }
+
+  @Test def round() {
+    testThis(
+      title = "ROUND",
+      syntax = "ROUND( expression )",
+      arguments = List("expression" -> "A numerical expression"),
+      text = "ROUND returns the numerical expression, rounded to the nearest integer.",
+      queryText = """start a=node(1) return round(3.141592)""",
+      returns = "",
+      assertions = (p) => assert(List(Map("round(3.141592)"->3)) === p.toList)
+    )
+  }
+
+  @Test def sqrt() {
+    testThis(
+      title = "SQRT",
+      syntax = "SQRT( expression )",
+      arguments = List("expression" -> "A numerical expression"),
+      text = "SQRT returns the square root of a number",
+      queryText = """start a=node(1) return sqrt(256)""",
+      returns = """All the nodes in the path p.""",
+      assertions = (p) => assert(List(Map("sqrt(256)"->16))=== p.toList)
+    )
+  }
+
+  @Test def sign() {
+    testThis(
+      title = "SIGN",
+      syntax = "SIGN( expression )",
+      arguments = List("expression" -> "A numerical expression"),
+      text = "Returns the signum of a number - zero if the expression is zero, -1 for any negative number, and 1 for any positive number.",
+      queryText = "start n=node(1) return sign(-17), sign(0.1)",
+      returns = """All the nodes in the path p.""",
+      assertions = (p) => assert(List(Map("sign(-17)"-> -1, "sign(0.1)"->1)) === p.toList)
+    )
+  }
   private def testThis(title: String, syntax: String, arguments: List[(String, String)], text: String, queryText: String, returns: String, assertions: (ExecutionResult => Unit)*) {
     val argsText = arguments.map(x => "* _" + x._1 + ":_ " + x._2).mkString("\r\n\r\n")
     val fullText = String.format("""%s

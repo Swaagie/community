@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -26,9 +26,9 @@ import java.util.List;
 public class AbstractNameRecord extends AbstractRecord
 {
     private int nameId = Record.NO_NEXT_BLOCK.intValue();
-    private List<DynamicRecord> nameRecords = new ArrayList<DynamicRecord>();
+    private final List<DynamicRecord> nameRecords = new ArrayList<DynamicRecord>();
     private boolean isLight;
-    
+
     AbstractNameRecord( int id )
     {
         super( id );
@@ -43,7 +43,7 @@ public class AbstractNameRecord extends AbstractRecord
     {
         return isLight;
     }
-    
+
     public int getNameId()
     {
         return nameId;
@@ -64,17 +64,25 @@ public class AbstractNameRecord extends AbstractRecord
         nameRecords.add( record );
     }
 
+    @Override
     public String toString()
     {
         StringBuilder buf = new StringBuilder( getClass().getSimpleName() + "[" );
-        buf.append( getId() ).append( "," ).append( inUse() ).append( "," ).append( nameId );
-        String more = additionalToString();
-        if ( more != null ) buf.append( "," + more );
-        return buf.append( "]" ).toString();
+        buf.append( getId() ).append( "," ).append( inUse() ? "in" : "no" ).append( " use" );
+        buf.append( ",nameId=" ).append( nameId );
+        additionalToString( buf );
+        if ( !isLight )
+        {
+            for ( DynamicRecord dyn : nameRecords )
+            {
+                buf.append( ',' ).append( dyn );
+            }
+        }
+        return buf.append( ']' ).toString();
     }
 
-    protected String additionalToString()
+    protected void additionalToString( StringBuilder buf )
     {
-        return null;
+        // default: nothing additional
     }
 }

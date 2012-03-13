@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -55,7 +55,13 @@ public class Eval extends GraphDatabaseApp
     @Override
     protected String exec( AppCommandParser parser, Session session, Output out ) throws Exception
     {
-        if ( !parser.getLine().endsWith( "\n" ) ) return "c";
+        // satisfied if:
+        // * it ends with \n
+        // * there's stuff after eval and no \n on the line
+        boolean satisfied =
+                parser.getLine().endsWith( "\n" ) ||
+                (parser.getLineWithoutApp().length() > 0 && parser.getLine().indexOf( '\n' ) == -1);
+        if ( !satisfied ) return "c";
         scripting = scripting != null ? scripting : new ScriptEngineViaReflection( getServer() );
         String javascriptCode = parser.getLineWithoutApp();
         javascriptCode = decorateWithImports( javascriptCode, STANDARD_EVAL_IMPORTS );

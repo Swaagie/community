@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -90,8 +90,14 @@ abstract class KernelDiagnostics implements DiagnosticsProvider
         private static long logStoreFiles( StringLogger.LineLogger logger, String prefix, File dir )
         {
             if ( !dir.isDirectory() ) return 0;
+            File[] files = dir.listFiles();
+            if ( files == null )
+            {
+                logger.logLine( prefix + "<INACCESSIBLE>" );
+                return 0;
+            }
             long total = 0;
-            for ( File file : dir.listFiles() )
+            for ( File file : files )
             {
                 long size;
                 String filename = file.getName();

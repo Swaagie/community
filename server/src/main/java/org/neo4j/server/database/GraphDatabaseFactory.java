@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,9 +21,9 @@ package org.neo4j.server.database;
 
 import java.util.Map;
 
-import org.neo4j.kernel.AbstractGraphDatabase;
+import org.neo4j.kernel.GraphDatabaseSPI;
 
 public interface GraphDatabaseFactory
 {
-    AbstractGraphDatabase createDatabase( String databaseStoreDirectory, Map<String, String> databaseProperties );
+    GraphDatabaseSPI createDatabase( String databaseStoreDirectory, Map<String, String> databaseProperties );
 }

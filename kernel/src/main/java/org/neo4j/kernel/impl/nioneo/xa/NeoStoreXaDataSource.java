@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -27,17 +27,16 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Properties;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
+import org.neo4j.graphdb.DependencyResolver;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Relationship;
 import org.neo4j.graphdb.RelationshipType;
 import org.neo4j.helpers.Exceptions;
 import org.neo4j.helpers.Pair;
-import org.neo4j.helpers.Service;
 import org.neo4j.helpers.UTF8;
 import org.neo4j.helpers.collection.ClosableIterable;
 import org.neo4j.helpers.collection.Visitor;
@@ -45,9 +44,11 @@ import org.neo4j.kernel.Config;
 import org.neo4j.kernel.impl.core.LockReleaser;
 import org.neo4j.kernel.impl.core.PropertyIndex;
 import org.neo4j.kernel.impl.index.IndexStore;
+import org.neo4j.kernel.impl.nioneo.store.FileSystemAbstraction;
 import org.neo4j.kernel.impl.nioneo.store.NeoStore;
 import org.neo4j.kernel.impl.nioneo.store.PropertyStore;
 import org.neo4j.kernel.impl.nioneo.store.Store;
+import org.neo4j.kernel.impl.nioneo.store.StoreFactory;
 import org.neo4j.kernel.impl.nioneo.store.StoreId;
 import org.neo4j.kernel.impl.nioneo.store.WindowPoolStats;
 import org.neo4j.kernel.impl.persistence.IdGenerationFailedException;
@@ -59,6 +60,7 @@ import org.neo4j.kernel.impl.transaction.xaframework.XaCommand;
 import org.neo4j.kernel.impl.transaction.xaframework.XaCommandFactory;
 import org.neo4j.kernel.impl.transaction.xaframework.XaConnection;
 import org.neo4j.kernel.impl.transaction.xaframework.XaContainer;
+import org.neo4j.kernel.impl.transaction.xaframework.XaFactory;
 import org.neo4j.kernel.impl.transaction.xaframework.XaResource;
 import org.neo4j.kernel.impl.transaction.xaframework.XaTransaction;
 import org.neo4j.kernel.impl.transaction.xaframework.XaTransactionFactory;
@@ -79,8 +81,21 @@ import org.neo4j.kernel.info.DiagnosticsPhase;
  */
 public class NeoStoreXaDataSource extends LogBackedXaDataSource
 {
+    public interface Configuration
+        extends LogBackedXaDataSource.Configuration
+    {
+        boolean read_only(boolean def);
+
+        String store_dir();
+
+        String neo_store();
+
+        String logical_log();
+
+        boolean intercept_committing_transactions(boolean def);
+    }
+
     public static final byte BRANCH_ID[] = UTF8.encode( "414141" );
-    private static final String REBUILD_IDGENERATORS_FAST = "rebuild_idgenerators_fast";
     public static final String LOGICAL_LOG_DEFAULT_NAME = "nioneo_logical.log";
 
     private static Logger logger = Logger.getLogger(
@@ -161,62 +176,45 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource
      * configuration file or Neo4j store can't be loaded an <CODE>IOException is
      * thrown</CODE>.
      *
-     * @param params
-     *            A map containing configuration parameters and/or configuration
-     *            file.
      * @throws IOException
      *             If unable to create data source
      */
-    public NeoStoreXaDataSource( Map<Object,Object> config ) throws IOException,
-        InstantiationException
+    public NeoStoreXaDataSource( Configuration conf, FileSystemAbstraction fileSystem, StoreFactory sf,
+                                 LockManager lockManager, LockReleaser lockReleaser, StringLogger stringLogger,
+                                 XaFactory xaFactory, List<Pair<TransactionInterceptorProvider, Object>> providers,
+                                 DependencyResolver dependencyResolver) throws IOException
     {
-        super( config );
-        readOnly = Boolean.parseBoolean( (String) config.get( Config.READ_ONLY ) );
-        this.lockManager = (LockManager) config.get( LockManager.class );
-        this.lockReleaser = (LockReleaser) config.get( LockReleaser.class );
-        storeDir = (String) config.get( "store_dir" );
-        msgLog = (StringLogger) config.get( StringLogger.class );
-        String store = (String) config.get( "neo_store" );
-        if ( !config.containsKey( REBUILD_IDGENERATORS_FAST ) )
-        {
-            config.put( REBUILD_IDGENERATORS_FAST, "true" );
-        }
-        File file = new File( store );
-        String create = "" + config.get( "create" );
-        if ( !readOnly && !file.exists() && "true".equals( create ) )
+        super( BRANCH_ID, Config.DEFAULT_DATA_SOURCE_NAME );
+        this.providers = providers;
+
+        readOnly = conf.read_only(false);
+        this.lockManager = lockManager;
+        this.lockReleaser = lockReleaser;
+        msgLog = stringLogger;
+        storeDir = conf.store_dir();
+        String store = conf.neo_store();
+        if ( !readOnly && !fileSystem.fileExists( store ))
         {
             msgLog.logMessage( "Creating new db @ " + store, true );
             autoCreatePath( store );
-            NeoStore.createStore( store, config );
+            sf.createNeoStore(store).close();
         }
 
-        providers = new ArrayList<Pair<TransactionInterceptorProvider, Object>>(
-                2 );
-        for ( TransactionInterceptorProvider provider : Service.load( TransactionInterceptorProvider.class ) )
+        final TransactionFactory tf;
+        boolean shouldIntercept = conf.intercept_committing_transactions(false);
+        if ( shouldIntercept && !providers.isEmpty() )
         {
-            Object conf = config.get( TransactionInterceptorProvider.class.getSimpleName() + "." + provider.name() );
-            if ( conf != null )
-            {
-                providers.add( Pair.of( provider, conf ) );
-            }
-        }
-
-        TransactionFactory tf = null;
-        if ( "true".equalsIgnoreCase( (String) config.get( Config.INTERCEPT_COMMITTING_TRANSACTIONS ) )
-             && !providers.isEmpty() )
-        {
-            tf = new InterceptingTransactionFactory();
+            tf = new InterceptingTransactionFactory( dependencyResolver );
         }
         else
         {
             tf = new TransactionFactory();
         }
-        neoStore = new NeoStore( config );
-        config.put( NeoStore.class, neoStore );
-        xaContainer = XaContainer.create( this,
-                (String) config.get( "logical_log" ), new CommandFactory(
-                        neoStore ), tf, providers.isEmpty() ? null : providers,
-                config );
+        neoStore = sf.newNeoStore(store);
+
+        xaContainer = xaFactory.newXaContainer(this, conf.logical_log(), new CommandFactory( neoStore ), tf,
+                shouldIntercept && !providers.isEmpty() ? providers : null, dependencyResolver );
+
         try
         {
             if ( !readOnly )
@@ -240,7 +238,7 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource
                 logger.fine( "Waiting for TM to take care of recovered " +
                     "transactions." );
             }
-            idGenerators = new ArrayMap<Class<?>,Store>( 5, false, false );
+            idGenerators = new ArrayMap<Class<?>,Store>( (byte)5, false, false );
             this.idGenerators.put( Node.class, neoStore.getNodeStore() );
             this.idGenerators.put( Relationship.class,
                 neoStore.getRelationshipStore() );
@@ -250,7 +248,7 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource
                 neoStore.getPropertyStore() );
             this.idGenerators.put( PropertyIndex.class,
                 neoStore.getPropertyStore().getIndexStore() );
-            setKeepLogicalLogsIfSpecified( (String) config.get( Config.KEEP_LOGICAL_LOGS ), Config.DEFAULT_DATA_SOURCE_NAME );
+            setKeepLogicalLogsIfSpecified( conf.online_backup_enabled(false) ? "true" : conf.keep_logical_logs(null), Config.DEFAULT_DATA_SOURCE_NAME );
             setLogicalLogAtCreationTime( xaContainer.getLogicalLog() );
         }
         catch ( Throwable e )
@@ -283,54 +281,6 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource
         }
     }
 
-    /**
-     * Creates a data source with minimum (no memory mapped) configuration.
-     *
-     * @param neoStoreFileName
-     *            The file name of the store
-     * @param logicalLogPath
-     *            The file name of the logical log
-     * @throws IOException
-     *             If unable to open store
-     */
-//    public NeoStoreXaDataSource( String neoStoreFileName,
-//        String logicalLogPath, LockManager lockManager,
-//        LockReleaser lockReleaser )
-//        throws IOException, InstantiationException
-//    {
-//        super( null );
-//        this.readOnly = false;
-//        this.lockManager = lockManager;
-//        this.lockReleaser = lockReleaser;
-//        storeDir = logicalLogPath;
-//        neoStore = new NeoStore( neoStoreFileName );
-//        xaContainer = XaContainer.create( this, logicalLogPath, new CommandFactory(
-//            neoStore ), new TransactionFactory(), null );
-//        setLogicalLogAtCreationTime( xaContainer.getLogicalLog() );
-//
-//        xaContainer.openLogicalLog();
-//        if ( !xaContainer.getResourceManager().hasRecoveredTransactions() )
-//        {
-//            neoStore.makeStoreOk();
-//        }
-//        else
-//        {
-//            logger.info( "Waiting for TM to take care of recovered " +
-//                "transactions." );
-//        }
-//        idGenerators = new ArrayMap<Class<?>,Store>( 5, false, false );
-//        this.idGenerators.put( Node.class, neoStore.getNodeStore() );
-//        this.idGenerators.put( Relationship.class,
-//            neoStore.getRelationshipStore() );
-//        this.idGenerators.put( RelationshipType.class,
-//            neoStore.getRelationshipTypeStore() );
-//        // get TestXa unit test to run
-//        this.idGenerators.put( PropertyStore.class,
-//            neoStore.getPropertyStore() );
-//        this.idGenerators.put( PropertyIndex.class,
-//            neoStore.getPropertyStore().getIndexStore() );
-//    }
-
     public NeoStore getNeoStore()
     {
         return neoStore;
@@ -360,7 +310,7 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource
     }
 
     @Override
-    public XaConnection getXaConnection()
+    public NeoStoreXaConnection getXaConnection()
     {
         return new NeoStoreXaConnection( neoStore,
             xaContainer.getResourceManager(), getBranchId() );
@@ -391,12 +341,19 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource
 
     private class InterceptingTransactionFactory extends TransactionFactory
     {
+        private final DependencyResolver dependencyResolver;
+
+        public InterceptingTransactionFactory( DependencyResolver dependencyResolver )
+        {
+            this.dependencyResolver = dependencyResolver;
+        }
+
         @Override
         public XaTransaction create( int identifier )
         {
 
             TransactionInterceptor first = TransactionInterceptorProvider.resolveChain(
-                    providers, NeoStoreXaDataSource.this );
+                    providers, NeoStoreXaDataSource.this, dependencyResolver );
             return new InterceptingWriteTransaction( identifier,
                     getLogicalLog(), neoStore, lockReleaser, lockManager, first );
         }
@@ -525,7 +482,7 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource
 
     public void setCurrentLogVersion( long version )
     {
-        neoStore.setVersion( version );
+        neoStore.setVersion(version);
     }
 
     // used for testing, do not use.
@@ -622,13 +579,18 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource
         };
     }
 
-    public StringLogger getMsgLog()
+    public void logStoreVersions()
     {
-        return msgLog;
+ // TODO This needs to be reconciled with new Diagnostics       neoStore.logVersions();
+    }
+
+    public void logIdUsage()
+    {
+ // TODO This needs to be reconciled with new Diagnostics       neoStore.logIdUsage();
     }
 
     public void registerDiagnosticsWith( DiagnosticsManager manager )
-    {
-        manager.registerAll( Diagnostics.class, this );
-    }
+     {
+         manager.registerAll( Diagnostics.class, this );
+     }
 }

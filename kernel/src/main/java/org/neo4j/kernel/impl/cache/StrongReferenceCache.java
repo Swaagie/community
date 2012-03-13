@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -76,7 +76,7 @@ public class StrongReferenceCache<K,V> implements Cache<K,V>
         return cache.remove( key );
     }
 
-    private final HitCounter counter = HitCounter.create();
+    private final HitCounter counter = new HitCounter();
 
     @Override
     public long hitCount()

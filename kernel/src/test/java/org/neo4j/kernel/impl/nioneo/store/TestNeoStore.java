@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,10 +19,6 @@
  */
 package org.neo4j.kernel.impl.nioneo.store;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -34,7 +30,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
-import javax.transaction.TransactionManager;
 import javax.transaction.xa.XAException;
 import javax.transaction.xa.XAResource;
 import javax.transaction.xa.Xid;
@@ -50,8 +45,8 @@ import org.neo4j.helpers.Pair;
 import org.neo4j.helpers.collection.CombiningIterable;
 import org.neo4j.helpers.collection.MapUtil;
 import org.neo4j.kernel.CommonFactories;
+import org.neo4j.kernel.ConfigProxy;
 import org.neo4j.kernel.EmbeddedGraphDatabase;
-import org.neo4j.kernel.IdGeneratorFactory;
 import org.neo4j.kernel.impl.AbstractNeo4jTestCase;
 import org.neo4j.kernel.impl.core.LockReleaser;
 import org.neo4j.kernel.impl.core.PropertyIndex;
@@ -60,18 +55,20 @@ import org.neo4j.kernel.impl.nioneo.xa.NeoStoreXaDataSource;
 import org.neo4j.kernel.impl.transaction.LockManager;
 import org.neo4j.kernel.impl.transaction.PlaceboTm;
 import org.neo4j.kernel.impl.transaction.XidImpl;
-import org.neo4j.kernel.impl.transaction.xaframework.LogBufferFactory;
+import org.neo4j.kernel.impl.transaction.xaframework.TransactionInterceptorProvider;
 import org.neo4j.kernel.impl.transaction.xaframework.TxIdGenerator;
+import org.neo4j.kernel.impl.transaction.xaframework.XaFactory;
 import org.neo4j.kernel.impl.util.ArrayMap;
 import org.neo4j.kernel.impl.util.FileUtils;
-import org.neo4j.kernel.impl.util.StringLogger;
 import org.neo4j.kernel.impl.util.RelIdArray.DirectionWrapper;
+import org.neo4j.kernel.impl.util.StringLogger;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 public class TestNeoStore extends AbstractNeo4jTestCase
 {
-    private static final IdGeneratorFactory ID_GENERATOR_FACTORY =
-            CommonFactories.defaultIdGeneratorFactory();
-
     private PropertyStore pStore;
     private RelationshipTypeStore rtStore;
 
@@ -100,10 +97,10 @@ public class TestNeoStore extends AbstractNeo4jTestCase
     public void setUpNeoStore() throws Exception
     {
         deleteFileOrDirectory( path() );
-        NeoStore.createStore( file( "neo" ), MapUtil.map(
-                IdGeneratorFactory.class, ID_GENERATOR_FACTORY,
-                FileSystemAbstraction.class, CommonFactories.defaultFileSystemAbstraction(),
-                LogBufferFactory.class, CommonFactories.defaultLogBufferFactory() ) );
+
+        Map<String,String> config = new HashMap<String, String>();
+        StoreFactory sf = new StoreFactory(config, CommonFactories.defaultIdGeneratorFactory(), CommonFactories.defaultFileSystemAbstraction(), null, StringLogger.SYSTEM, null);
+        sf.createNeoStore(file( "neo" )).close();
     }
 
     private static class MyPropertyIndex extends
@@ -149,31 +146,26 @@ public class TestNeoStore extends AbstractNeo4jTestCase
 
     private void initializeStores() throws IOException
     {
-        try
-        {
-            LockManager lockManager = getEmbeddedGraphDb().getConfig()
-                .getLockManager();
-            LockReleaser lockReleaser = getEmbeddedGraphDb().getConfig()
-                .getLockReleaser();
+        LockManager lockManager = getEmbeddedGraphDb().getLockManager();
+        LockReleaser lockReleaser = getEmbeddedGraphDb().getLockReleaser();
 
-            ds = new NeoStoreXaDataSource( MapUtil.genericMap(
-                    LockManager.class, lockManager,
-                    LockReleaser.class, lockReleaser,
-                    IdGeneratorFactory.class, ID_GENERATOR_FACTORY,
-                    FileSystemAbstraction.class, CommonFactories.defaultFileSystemAbstraction(),
-                    LogBufferFactory.class, CommonFactories.defaultLogBufferFactory(),
-                    TxIdGenerator.class, TxIdGenerator.DEFAULT,
-                    StringLogger.class, StringLogger.DEV_NULL,
-                    TransactionManager.class, new PlaceboTm(),
-                    "store_dir", path(),
-                    "neo_store", file( "neo" ),
-                    "logical_log", file( "nioneo_logical.log" ) ) );
-        }
-        catch ( InstantiationException e )
-        {
-            throw new IOException( "" + e );
-        }
-        xaCon = (NeoStoreXaConnection) ds.getXaConnection();
+        Map<String, String> config = MapUtil.stringMap(
+                "store_dir", path(),
+                "neo_store", file("neo"),
+                "logical_log", file("nioneo_logical.log"));
+        StoreFactory sf = new StoreFactory(config, CommonFactories.defaultIdGeneratorFactory(), CommonFactories.defaultFileSystemAbstraction(), null, StringLogger.DEV_NULL, null);
+
+        ds = new NeoStoreXaDataSource(ConfigProxy.config(config, NeoStoreXaDataSource.Configuration.class),
+                                      CommonFactories.defaultFileSystemAbstraction(), sf, lockManager, lockReleaser,
+                                      StringLogger.DEV_NULL, new XaFactory( Collections.<String,String>emptyMap(),
+                                                                            TxIdGenerator.DEFAULT, new PlaceboTm(),
+                                                                            CommonFactories.defaultLogBufferFactory(),
+                                                                            CommonFactories.defaultFileSystemAbstraction(),
+                                                                            StringLogger.DEV_NULL,
+                                                                            CommonFactories.defaultRecoveryVerifier() ),
+                                      Collections.<Pair<TransactionInterceptorProvider,Object>>emptyList(), null );
+
+        xaCon = ds.getXaConnection();
         pStore = xaCon.getPropertyStore();
         rtStore = xaCon.getRelationshipTypeStore();
     }
@@ -413,7 +405,7 @@ public class TestNeoStore extends AbstractNeo4jTestCase
     {
         NodeRecord nodeRecord = xaCon.getWriteTransaction().nodeLoadLight( node );
         assertTrue( nodeRecord != null );
-        ArrayMap<Integer,PropertyData> props = xaCon.getWriteTransaction().nodeLoadProperties( node, nodeRecord.getNextProp(), false );
+        ArrayMap<Integer,PropertyData> props = xaCon.getWriteTransaction().nodeLoadProperties( node, false );
         int count = 0;
         for ( int keyId : props.keySet() )
         {
@@ -486,7 +478,7 @@ public class TestNeoStore extends AbstractNeo4jTestCase
     {
         NodeRecord nodeRecord = xaCon.getWriteTransaction().nodeLoadLight( node );
         assertTrue( nodeRecord != null );
-        ArrayMap<Integer,PropertyData> props = xaCon.getWriteTransaction().nodeLoadProperties( node, nodeRecord.getNextProp(), false );
+        ArrayMap<Integer,PropertyData> props = xaCon.getWriteTransaction().nodeLoadProperties( node, false );
         int count = 0;
         for ( int keyId : props.keySet() )
         {
@@ -790,8 +782,7 @@ public class TestNeoStore extends AbstractNeo4jTestCase
             PropertyData prop2, PropertyData prop3 )
         throws IOException
     {
-        ArrayMap<Integer,PropertyData> props = xaCon.getWriteTransaction().nodeLoadProperties( node,
-                xaCon.getWriteTransaction().nodeLoadLight( node ).getNextProp(), false );
+        ArrayMap<Integer,PropertyData> props = xaCon.getWriteTransaction().nodeLoadProperties( node, false );
         int count = 0;
         for ( int keyId : props.keySet() )
         {
@@ -825,8 +816,7 @@ public class TestNeoStore extends AbstractNeo4jTestCase
             count++;
         }
         assertEquals( 3, count );
-        assertEquals( 3, xaCon.getWriteTransaction().nodeLoadProperties( node,
-                xaCon.getWriteTransaction().nodeLoadLight( node ).getNextProp(), false ).size() );
+        assertEquals( 3, xaCon.getWriteTransaction().nodeLoadProperties( node, false ).size() );
         AtomicLong pos = getPosition( xaCon, node );
         Iterator<RelationshipRecord> rels = getMore( xaCon, node, pos ).iterator();
         assertTrue( rels.hasNext() );
@@ -837,8 +827,7 @@ public class TestNeoStore extends AbstractNeo4jTestCase
             PropertyData prop2, PropertyData prop3 )
         throws IOException
     {
-        ArrayMap<Integer,PropertyData> props = xaCon.getWriteTransaction().nodeLoadProperties( node,
-                xaCon.getWriteTransaction().nodeLoadLight( node ).getNextProp(), false );
+        ArrayMap<Integer,PropertyData> props = xaCon.getWriteTransaction().nodeLoadProperties( node, false );
         int count = 0;
         for ( int keyId : props.keySet() )
         {
@@ -872,8 +861,7 @@ public class TestNeoStore extends AbstractNeo4jTestCase
             count++;
         }
         assertEquals( 3, count );
-        assertEquals( 3, xaCon.getWriteTransaction().nodeLoadProperties( node,
-                xaCon.getWriteTransaction().nodeLoadLight( node ).getNextProp(), false ).size() );
+        assertEquals( 3, xaCon.getWriteTransaction().nodeLoadProperties( node, false ).size() );
         AtomicLong pos = getPosition( xaCon, node );
         Iterator<RelationshipRecord> rels = getMore( xaCon, node, pos ).iterator();
         assertTrue( rels.hasNext() );
@@ -1039,12 +1027,14 @@ public class TestNeoStore extends AbstractNeo4jTestCase
     public void testSetBlockSize() throws Exception
     {
         tearDownNeoStore();
-        Map<Object,Object> config = new HashMap<Object, Object>();
+
+        Map<String,String> config = new HashMap<String, String>();
         config.put( "string_block_size", "62" );
         config.put( "array_block_size", "302" );
-        config.put( IdGeneratorFactory.class, CommonFactories.defaultIdGeneratorFactory() );
-        config.put( FileSystemAbstraction.class, CommonFactories.defaultFileSystemAbstraction() );
-        NeoStore.createStore( file( "neo" ), config );
+        StoreFactory sf = new StoreFactory(config, CommonFactories.defaultIdGeneratorFactory(), CommonFactories.defaultFileSystemAbstraction(), null, StringLogger.DEV_NULL, null);
+        sf.createNeoStore(file( "neo" )).close();
+
+
         initializeStores();
         assertEquals( 62 + AbstractDynamicStore.BLOCK_HEADER_SIZE,
                 pStore.getStringBlockSize() );
@@ -1052,7 +1042,7 @@ public class TestNeoStore extends AbstractNeo4jTestCase
                 pStore.getArrayBlockSize() );
         ds.close();
     }
-    
+
     @Test
     public void setVersion() throws Exception
     {
@@ -1061,11 +1051,11 @@ public class TestNeoStore extends AbstractNeo4jTestCase
         new EmbeddedGraphDatabase( storeDir ).shutdown();
         assertEquals( 0, NeoStore.setVersion( storeDir, 10 ) );
         assertEquals( 10, NeoStore.setVersion( storeDir, 12 ) );
-        
-        NeoStore neoStore = new NeoStore( MapUtil.map(
-                "neo_store", new File( storeDir, NeoStore.DEFAULT_NAME ).getAbsolutePath(),
-                FileSystemAbstraction.class, CommonFactories.defaultFileSystemAbstraction(),
-                IdGeneratorFactory.class, CommonFactories.defaultIdGeneratorFactory() ) );
+
+        StoreFactory sf = new StoreFactory(Collections.<String,String>emptyMap(),
+                CommonFactories.defaultIdGeneratorFactory(), CommonFactories.defaultFileSystemAbstraction(), null, StringLogger.DEV_NULL, null);
+
+        NeoStore neoStore = sf.newNeoStore(new File( storeDir, NeoStore.DEFAULT_NAME ).getAbsolutePath());
         assertEquals( 12, neoStore.getVersion() );
         neoStore.close();
     }

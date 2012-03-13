@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,13 +19,11 @@
  */
 package org.neo4j.kernel.impl.nioneo.store;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 
 import org.neo4j.helpers.UTF8;
 import org.neo4j.kernel.IdGeneratorFactory;
@@ -44,6 +42,15 @@ import org.neo4j.kernel.impl.util.StringLogger;
  */
 public abstract class AbstractStore extends CommonAbstractStore
 {
+    public interface Configuration
+        extends CommonAbstractStore.Configuration
+    {
+
+        boolean rebuild_idgenerators_fast(boolean def);
+    }
+
+    private final Configuration conf;
+
     /**
      * Returns the fixed size of each record in this store.
      *
@@ -64,59 +71,10 @@ public abstract class AbstractStore extends CommonAbstractStore
         }
     }
 
-    /**
-     * Creates a new empty store. The factory method returning an implementation
-     * of some store type should make use of this method to initialize an empty
-     * store.
-     * <p>
-     * This method will create a empty store containing the descriptor returned
-     * by the <CODE>getTypeDescriptor()</CODE>. The id generator
-     * used by this store will also be created
-     *
-     * @param fileName
-     *            The file name of the store that will be created
-     * @param typeAndVersionDescriptor
-     *            The type and version descriptor that identifies this store
-     * @throws IOException
-     *             If fileName is null or if file exists
-     */
-    protected static void createEmptyStore( String fileName,
-        String typeAndVersionDescriptor, IdGeneratorFactory idGeneratorFactory, FileSystemAbstraction fileSystem )
+    public AbstractStore( String fileName, Configuration conf, IdType idType, IdGeneratorFactory idGeneratorFactory, FileSystemAbstraction fileSystemAbstraction, StringLogger stringLogger )
     {
-        // sanity checks
-        if ( fileName == null )
-        {
-            throw new IllegalArgumentException( "Null filename" );
-        }
-        File file = new File( fileName );
-        if ( file.exists() )
-        {
-            throw new IllegalStateException( "Can't create store[" + fileName
-                + "], file already exists" );
-        }
-
-        // write the header
-        try
-        {
-            FileChannel channel = fileSystem.create( fileName );
-            int endHeaderSize = UTF8.encode( typeAndVersionDescriptor ).length;
-            ByteBuffer buffer = ByteBuffer.allocate( endHeaderSize );
-            buffer.put( UTF8.encode( typeAndVersionDescriptor ) ).flip();
-            channel.write( buffer );
-            channel.force( false );
-            channel.close();
-        }
-        catch ( IOException e )
-        {
-            throw new UnderlyingStorageException( "Unable to create store "
-                + fileName, e );
-        }
-        idGeneratorFactory.create( fileName + ".id" );
-    }
-
-    public AbstractStore( String fileName, Map<?,?> config, IdType idType )
-    {
-        super( fileName, config, idType );
+        super( fileName, conf, idType, idGeneratorFactory, fileSystemAbstraction, stringLogger );
+        this.conf = conf;
     }
 
     @Override
@@ -207,10 +165,9 @@ public abstract class AbstractStore extends CommonAbstractStore
         logger.fine( "Rebuilding id generator for[" + getStorageFileName()
             + "] ..." );
         closeIdGenerator();
-        File file = new File( getStorageFileName() + ".id" );
-        if ( file.exists() )
+        if ( fileSystemAbstraction.fileExists( getStorageFileName() + ".id" ) )
         {
-            boolean success = file.delete();
+            boolean success = fileSystemAbstraction.deleteFile( getStorageFileName() + ".id" );
             assert success;
         }
         createIdGenerator( getStorageFileName() + ".id" );
@@ -223,17 +180,12 @@ public abstract class AbstractStore extends CommonAbstractStore
             long fileSize = fileChannel.size();
             int recordSize = getRecordSize();
             boolean fullRebuild = true;
-            if ( getConfig() != null )
+            if ( conf.rebuild_idgenerators_fast(true))
             {
-                String mode = (String)
-                    getConfig().get( "rebuild_idgenerators_fast" );
-                if ( mode != null && mode.toLowerCase().equals( "true" ) )
-                {
-                    fullRebuild = false;
-                    highId = findHighIdBackwards();
-                }
+                fullRebuild = false;
+                highId = findHighIdBackwards();
             }
-            ByteBuffer byteBuffer = ByteBuffer.wrap( new byte[1] );
+            ByteBuffer byteBuffer = ByteBuffer.allocate( recordSize );
             // Duplicated code block
             LinkedList<Long> freeIdList = new LinkedList<Long>();
             if ( fullRebuild )
@@ -242,18 +194,17 @@ public abstract class AbstractStore extends CommonAbstractStore
                     i++ )
                 {
                     fileChannel.position( i * recordSize );
+                    byteBuffer.clear();
                     fileChannel.read( byteBuffer );
                     byteBuffer.flip();
-                    byte inUse = byteBuffer.get();
-                    byteBuffer.flip();
-                    nextId();
-                    if ( (inUse & 0x1) == Record.NOT_IN_USE.byteValue() )
+                    if ( !isRecordInUse( byteBuffer ) )
                     {
                         freeIdList.add( i );
                     }
                     else
                     {
                         highId = i;
+                        setHighId( highId+1 );
                         while ( !freeIdList.isEmpty() )
                         {
                             freeId( freeIdList.removeFirst() );
@@ -269,12 +220,8 @@ public abstract class AbstractStore extends CommonAbstractStore
                 "Unable to rebuild id generator " + getStorageFileName(), e );
         }
         setHighId( highId + 1 );
-        if ( getConfig() != null )
-        {
-            StringLogger msgLog = (StringLogger) getConfig().get( StringLogger.class );
-            msgLog.logMessage( getStorageFileName() + " rebuild id generator, highId=" + getHighId() +
-                    " defragged count=" + defraggedCount, true );
-        }
+        stringLogger.logMessage( getStorageFileName() + " rebuild id generator, highId=" + getHighId() +
+                " defragged count=" + defraggedCount, true );
         logger.fine( "[" + getStorageFileName() + "] high id=" + getHighId()
             + " (defragged=" + defraggedCount + ")" );
         closeIdGenerator();

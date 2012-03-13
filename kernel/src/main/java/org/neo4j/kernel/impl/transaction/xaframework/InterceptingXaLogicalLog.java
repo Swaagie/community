@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,22 +21,27 @@ package org.neo4j.kernel.impl.transaction.xaframework;
 
 import java.nio.channels.ReadableByteChannel;
 import java.util.List;
-import java.util.Map;
 
+import org.neo4j.graphdb.DependencyResolver;
 import org.neo4j.helpers.Pair;
+import org.neo4j.kernel.impl.nioneo.store.FileSystemAbstraction;
 import org.neo4j.kernel.impl.nioneo.xa.Command;
+import org.neo4j.kernel.impl.util.StringLogger;
 
 public class InterceptingXaLogicalLog extends XaLogicalLog
 {
-    private final List<Pair<TransactionInterceptorProvider, Object>> providers;
     private final XaDataSource ds;
+    private final List<Pair<TransactionInterceptorProvider, Object>> providers;
+    private final DependencyResolver dependencyResolver;
 
-    InterceptingXaLogicalLog( String fileName, XaResourceManager xaRm,
+    public InterceptingXaLogicalLog( String fileName, XaResourceManager xaRm,
             XaCommandFactory cf, XaTransactionFactory xaTf,
-            Map<Object, Object> config, List<Pair<TransactionInterceptorProvider, Object>> providers )
+            List<Pair<TransactionInterceptorProvider, Object>> providers, DependencyResolver dependencyResolver,
+            LogBufferFactory logBufferFactory, FileSystemAbstraction fileSystem, StringLogger stringLogger )
     {
-        super( fileName, xaRm, cf, xaTf, config );
+        super( fileName, xaRm, cf, xaTf, logBufferFactory, fileSystem, stringLogger );
         this.providers = providers;
+        this.dependencyResolver = dependencyResolver;
         this.ds = xaRm.getDataSource();
     }
 
@@ -44,9 +49,8 @@ public class InterceptingXaLogicalLog extends XaLogicalLog
     protected LogDeserializer getLogDeserializer(
             ReadableByteChannel byteChannel )
     {
-        final TransactionInterceptor first = TransactionInterceptorProvider.resolveChain(
-                providers, ds );
-
+        final TransactionInterceptor interceptor = TransactionInterceptorProvider.resolveChain( providers, ds, dependencyResolver );
+        
         LogDeserializer toReturn = new LogDeserializer( byteChannel )
         {
             @Override
@@ -59,19 +63,19 @@ public class InterceptingXaLogicalLog extends XaLogicalLog
                         LogEntry.Command commandEntry = (LogEntry.Command) entry;
                         if ( commandEntry.getXaCommand() instanceof Command )
                         {
-                            ( (Command) commandEntry.getXaCommand() ).accept( first );
+                            ( (Command) commandEntry.getXaCommand() ).accept( interceptor );
                         }
                     }
                     else if ( entry instanceof LogEntry.Start )
                     {
-                        first.setStartEntry( (LogEntry.Start) entry );
+                        interceptor.setStartEntry( (LogEntry.Start) entry );
                     }
                     else if ( entry instanceof LogEntry.Commit )
                     {
-                        first.setCommitEntry( (LogEntry.Commit) entry );
+                        interceptor.setCommitEntry( (LogEntry.Commit) entry );
                     }
                 }
-                first.complete();
+                interceptor.complete();
             }
         };
         return toReturn;

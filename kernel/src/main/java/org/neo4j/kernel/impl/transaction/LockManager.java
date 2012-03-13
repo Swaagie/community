@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 
 import javax.transaction.Transaction;
-import javax.transaction.TransactionManager;
 
 import org.neo4j.helpers.collection.Visitor;
 import org.neo4j.kernel.DeadlockDetectedException;
@@ -57,9 +56,9 @@ public class LockManager
 
     private final RagManager ragManager;
 
-    public LockManager( TransactionManager tm )
+    public LockManager( RagManager ragManager)
     {
-        ragManager = new RagManager( tm );
+        this.ragManager = ragManager;
     }
 
     public long getDetectedDeadlockCount()

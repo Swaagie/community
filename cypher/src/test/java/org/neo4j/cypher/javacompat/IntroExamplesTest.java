@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -32,6 +32,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
+import org.neo4j.test.AsciiDocGenerator;
 import org.neo4j.test.GraphDescription;
 import org.neo4j.test.GraphDescription.Graph;
 import org.neo4j.test.GraphHolder;
@@ -49,17 +50,17 @@ public class IntroExamplesTest implements GraphHolder
             this, true ) );
     private static ImpermanentGraphDatabase graphdb;
     private static ExecutionEngine engine;
-    private static CypherParser parser;
 
     @Test
     @Graph( value = { "John friend Sara", "John friend Joe",
             "Sara friend Maria", "Joe friend Steve" }, autoIndexNodes = true )
     public void intro_examples() throws Exception
     {
-        Writer fw = gen.get().getFW( "target/docs/dev/", gen.get().getTitle() );
+        Writer fw = AsciiDocGenerator.getFW( "target/docs/dev/", gen.get().getTitle() );
         data.get();
         fw.append( "\nImagine an example graph like\n\n" );
-        fw.append( AsciidocHelper.createGraphViz( "Example Graph", graphdb(),
+        fw.append( AsciidocHelper.createGraphVizWithNodeId( "Example Graph",
+                graphdb(),
                 "cypher-intro" ) );
 
         fw.append( "For example, here is a query which finds a user called John in an index and then traverses the graph looking for friends of Johns friends (though not his direct friends) before returning both John and any friends-of-friends that are found." );
@@ -68,8 +69,7 @@ public class IntroExamplesTest implements GraphHolder
                        + "MATCH john-[:friend]->()-[:friend]->fof RETURN john, fof ";
         fw.append( createCypherSnippet( query ) );
         fw.append( "\nResulting in \n" );
-        fw.append( createQueryResultSnippet( engine.execute(
-                parser.parse( query ) ).toString() ) );
+        fw.append( createQueryResultSnippet( engine.execute( query  ).toString() ) );
 
         fw.append( "Next up we will add filtering to set all four parts "
                    + "in motion:\n\nIn this next example, we take a list of users "
@@ -90,8 +90,7 @@ public class IntroExamplesTest implements GraphHolder
         fw.append( "\n" );
         fw.append( createCypherSnippet( query ) );
         fw.append( "\nResulting in\n" );
-        fw.append( createQueryResultSnippet( engine.execute(
-                parser.parse( query ) ).toString() ) );
+        fw.append( createQueryResultSnippet( engine.execute( query ).toString() ) );
         fw.close();
     }
 
@@ -101,7 +100,6 @@ public class IntroExamplesTest implements GraphHolder
         graphdb = new ImpermanentGraphDatabase();
         graphdb.cleanContent( false );
 
-        parser = new CypherParser();
         engine = new ExecutionEngine( graphdb );
     }
     

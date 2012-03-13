@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,13 +21,13 @@ package org.neo4j.server.plugins;
 
 import org.neo4j.graphdb.DynamicRelationshipType;
 import org.neo4j.graphdb.RelationshipType;
-import org.neo4j.kernel.AbstractGraphDatabase;
+import org.neo4j.kernel.GraphDatabaseSPI;
 import org.neo4j.server.rest.repr.BadInputException;
 
 class RelationshipTypeTypeCaster extends TypeCaster
 {
     @Override
-    Object get( AbstractGraphDatabase graphDb, ParameterList parameters, String name ) throws BadInputException
+    Object get( GraphDatabaseSPI graphDb, ParameterList parameters, String name ) throws BadInputException
     {
         String typeName = parameters.getString( name );
         if ( typeName == null ) return null;
@@ -35,7 +35,7 @@ class RelationshipTypeTypeCaster extends TypeCaster
     }
 
     @Override
-    Object[] getList( AbstractGraphDatabase graphDb, ParameterList parameters, String name ) throws BadInputException
+    Object[] getList( GraphDatabaseSPI graphDb, ParameterList parameters, String name ) throws BadInputException
     {
         String[] strings = parameters.getStringList( name );
         if ( strings == null ) return null;

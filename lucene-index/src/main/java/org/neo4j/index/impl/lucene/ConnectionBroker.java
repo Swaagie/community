@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -23,12 +23,12 @@ import javax.transaction.TransactionManager;
 
 import org.neo4j.kernel.impl.index.IndexConnectionBroker;
 
-class ConnectionBroker extends IndexConnectionBroker<LuceneXaConnection>
+public class ConnectionBroker extends IndexConnectionBroker<LuceneXaConnection>
 {
     private final LuceneDataSource xaDs;
 
-    ConnectionBroker( TransactionManager transactionManager,
-            LuceneDataSource dataSource )
+    public ConnectionBroker(TransactionManager transactionManager,
+                            LuceneDataSource dataSource)
     {
         super( transactionManager );
         this.xaDs = dataSource;

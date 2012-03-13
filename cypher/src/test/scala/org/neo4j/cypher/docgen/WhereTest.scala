@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -83,19 +83,28 @@ class WhereTest extends DocumentingTestBase {
     testQuery(
       title = "Property exists",
       text = "To only include nodes/relationships that have a property, just write out the identifier and the property you expect it to have.",
-      queryText = """start n=node(%Andres%, %Tobias%) where n.belt return n""",
+      queryText = """start n=node(%Andres%, %Tobias%) where has(n.belt) return n""",
       returns = """The node named Andres.""",
       assertions = (p) => assertEquals(List(node("Andres")), p.columnAs[Node]("n").toList))
   }
 
   @Test def compare_if_property_exists() {
     testQuery(
-      title = "Compare if property exists",
-      text = "If you want to compare a property on a graph element, but only if it exists, use the nullable property syntax. It is the property" +
-        " with the dot notation, followed by a question mark",
+      title = "Default true if property is missing",
+      text = "If you want to compare a property on a graph element, but only if it exists, use the nullable property syntax. " +
+        "You can use a question mark if you want missing property to return true, like:",
       queryText = """start n=node(%Andres%, %Tobias%) where n.belt? = 'white' return n""",
       returns = "All nodes, even those without the belt property",
       assertions = (p) => assertEquals(List(node("Andres"), node("Tobias")), p.columnAs[Node]("n").toList))
+  }
+
+  @Test def compare_if_property_exists_default_false() {
+    testQuery(
+      title = "Default false if property is missing",
+      text = "When you need missing property to evaluate to false, use the exclamation mark.",
+      queryText = """start n=node(%Andres%, %Tobias%) where n.belt! = 'white' return n""",
+      returns = "No nodes without the belt property are returned.",
+      assertions = (p) => assertEquals(List(node("Andres")), p.columnAs[Node]("n").toList))
   }
 
   @Test def filter_on_relationship_type() {
@@ -128,13 +137,22 @@ class WhereTest extends DocumentingTestBase {
       WHERE a<-[:KNOWS]-b
       WHERE a-[:KNOWS]-b
 
-      Note: You can not introduce new identifiers here! Although it might look very similar to the MATCH clause, the
+      Not that you can not introduce new identifiers here. Although it might look very similar to the MATCH clause, the
 WHERE clause is all about eliminating matched subgraphs. MATCH a-->b is very different from WHERE a-->b; the first will
 produce a subgraph for every relationship between a and b, and the latter will eliminate any matched subgraphs where a and b
 do not have a relationship between them.
       """,
-      queryText = """start a=node(%Tobias%), b=node(%Andres%, %Peter%) match a<-[r?]-b where r is null return b""",
+      queryText = """start a=node(%Tobias%), b=node(%Andres%, %Peter%) where a<--b return b""",
       returns = "Nodes that Tobias is not connected to",
-      assertions = (p) => assertEquals(List(Map("b" -> node("Peter"))), p.toList))
+      assertions = (p) => assertEquals(List(Map("b" -> node("Andres"))), p.toList))
+  }
+
+  @Test def in_operator() {
+    testQuery(
+      title = "IN operator",
+      text = "To check if an element exists in a collection, you can use the IN operator.",
+      queryText = """start a=node(%Andres%, %Tobias%, %Peter%) where a.name IN ["Peter", "Tobias"] return a""",
+      returns = "This query shows how to check if a property exists in a literal collection.",
+      assertions = (p) => assertEquals(List(node("Tobias"),node("Peter")), p.columnAs[Node]("a").toList))
   }
 }

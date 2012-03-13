@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,6 +19,9 @@
  */
 package org.neo4j.kernel.impl.transaction.xaframework;
 
+import javax.transaction.RollbackException;
+import javax.transaction.SystemException;
+import javax.transaction.Transaction;
 import javax.transaction.xa.XAResource;
 
 /**
@@ -39,7 +42,13 @@ public interface XaConnection
      * 
      * @return The resource associated with this connection
      */
-    public XAResource getXaResource();
+    XAResource getXaResource();
+
+    boolean enlistResource( Transaction javaxTx )
+        throws SystemException, RollbackException;
+
+    boolean delistResource( Transaction tx, int tmsuccess )
+        throws java.lang.IllegalStateException, javax.transaction.SystemException;
 
     /**
      * Destroys this connection and depending on <CODE>XAResource</CODE>
@@ -50,5 +59,6 @@ public interface XaConnection
      * invoke <CODE>getXaResource</CODE> or any other method that creates
      * transactions or performs work using the <CODE>XAResource</CODE>.
      */
-    public void destroy();
+    void destroy();
+
 }

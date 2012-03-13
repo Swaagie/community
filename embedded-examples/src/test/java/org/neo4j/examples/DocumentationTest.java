@@ -21,7 +21,7 @@
 package org.neo4j.examples;
 
 import static org.neo4j.visualization.asciidoc.AsciidocHelper.createCypherSnippet;
-import static org.neo4j.visualization.asciidoc.AsciidocHelper.createGraphViz;
+import static org.neo4j.visualization.asciidoc.AsciidocHelper.createGraphVizWithNodeId;
 import static org.neo4j.visualization.asciidoc.AsciidocHelper.createOutputSnippet;
 
 import org.junit.Test;
@@ -73,8 +73,8 @@ public class DocumentationTest extends AbstractJavaDocTestbase
     {
         // initialize the graph with the annotation data
         data.get();
-        gen.get().addSourceSnippets( this.getClass(), "sampleDocumentation" );
-        gen.get().addGithubLink( "github", this.getClass(), "neo4j/community",
+        gen.get().addTestSourceSnippets( this.getClass(), "sampleDocumentation" );
+        gen.get().addGithubTestSourceLink( "github", this.getClass(), "neo4j/community",
                 "embedded-examples" );
 
         gen.get().addSnippet( "output",
@@ -82,12 +82,12 @@ public class DocumentationTest extends AbstractJavaDocTestbase
 
         gen.get().addSnippet(
                 "graph",
-                createGraphViz( "Hello World Graph", graphdb(),
+                createGraphVizWithNodeId( "Hello World Graph", graphdb(),
                         gen.get().getTitle() ) );
         // A cypher snippet referring to the generated graph in the start clause
         gen.get().addSnippet(
                 "cypher",
-                createCypherSnippet( "start n = node(" + data.get().get( "I" )
+                createCypherSnippet( "start n = node(" + data.get().get( "I" ).getId()
                                      + ") return n" ) );
     }
 }

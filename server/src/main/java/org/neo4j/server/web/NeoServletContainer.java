@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,11 +19,9 @@
  */
 package org.neo4j.server.web;
 
-import com.sun.jersey.api.core.HttpContext;
-import com.sun.jersey.api.core.ResourceConfig;
-import com.sun.jersey.spi.container.WebApplication;
-import com.sun.jersey.spi.container.servlet.ServletContainer;
-import com.sun.jersey.spi.container.servlet.WebConfig;
+import java.util.Collection;
+import java.util.Set;
+
 import org.neo4j.server.NeoServer;
 import org.neo4j.server.NeoServerProvider;
 import org.neo4j.server.NeoServerWithEmbeddedWebServer;
@@ -39,8 +37,11 @@ import org.neo4j.server.rest.repr.OutputFormatProvider;
 import org.neo4j.server.rest.repr.RepresentationFormatRepository;
 import org.neo4j.server.rrd.RrdDbProvider;
 
-import java.util.Collection;
-import java.util.Set;
+import com.sun.jersey.api.core.HttpContext;
+import com.sun.jersey.api.core.ResourceConfig;
+import com.sun.jersey.spi.container.WebApplication;
+import com.sun.jersey.spi.container.servlet.ServletContainer;
+import com.sun.jersey.spi.container.servlet.WebConfig;
 
 @SuppressWarnings( "serial" )
 public class NeoServletContainer extends ServletContainer

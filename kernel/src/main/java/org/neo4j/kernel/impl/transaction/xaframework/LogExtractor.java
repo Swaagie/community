@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -52,10 +52,9 @@ public class LogExtractor
      * If tx range is smaller than this threshold ask the position cache for the
      * start position farthest back. Otherwise jump to right log and scan.
      */
-    private static final int CACHE_FIND_THRESHOLD = 100;
+    private static final int CACHE_FIND_THRESHOLD = 10000;
 
-    private final ByteBuffer localBuffer =
-            ByteBuffer.allocate( 9 + Xid.MAXGTRIDSIZE + Xid.MAXBQUALSIZE * 10 );
+    private final ByteBuffer localBuffer = newLogReaderBuffer();
     private ReadableByteChannel source;
     private final LogEntryCollector collector;
     private long version;
@@ -113,6 +112,11 @@ public class LogExtractor
         ReadableByteChannel getLogicalLogOrMyselfCommitted( long version, long position ) throws IOException;
         
         long getHighestLogVersion();
+    }
+    
+    static ByteBuffer newLogReaderBuffer()
+    {
+        return ByteBuffer.allocate( 9 + Xid.MAXGTRIDSIZE + Xid.MAXBQUALSIZE * 10 );
     }
 
     public LogExtractor( LogPositionCache cache, LogLoader logLoader,
@@ -261,10 +265,10 @@ public class LogExtractor
     {
         return lastCommitEntry;
     }
-
+    
     public long getLastTxChecksum()
     {
-        return getLastStartEntry().getTimeWritten();
+        return getLastStartEntry().getChecksum();
     }
 
     public Start getLastStartEntry()
@@ -495,15 +499,15 @@ public class LogExtractor
         final int masterId;
         final int identifier;
         final long position;
-        final long timeWritten;
+        final long checksum;
 
-        public TxPosition( long version, int masterId, int identifier, long position, long timeWritten )
+        public TxPosition( long version, int masterId, int identifier, long position, long checksum )
         {
             this.version = version;
             this.masterId = masterId;
             this.identifier = identifier;
             this.position = position;
-            this.timeWritten = timeWritten;
+            this.checksum = checksum;
         }
 
         public boolean earlierThan( TxPosition other )

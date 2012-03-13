@@ -1,6 +1,6 @@
 <!--
 
-    Copyright (c) 2002-2011 "Neo Technology,"
+    Copyright (c) 2002-2012 "Neo Technology,"
     Network Engine for Objects in Lund AB [http://neotechnology.com]
 
     This file is part of Neo4j.
@@ -29,7 +29,7 @@
     <fileSet>
       <filtered>true</filtered>
       <directory>target/docs</directory>
-      <outputDirectory>/dev</outputDirectory>
+      <outputDirectory>/</outputDirectory>
     </fileSet>
     <fileSet>
       <directory>src/docs</directory>

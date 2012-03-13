@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,16 +19,14 @@
  */
 package org.neo4j.kernel;
 
+import org.neo4j.kernel.impl.nioneo.store.FileSystemAbstraction;
 import org.neo4j.kernel.impl.nioneo.store.IdGenerator;
-import org.neo4j.kernel.impl.nioneo.store.NeoStore;
 
 public interface IdGeneratorFactory
 {
-    IdGenerator open( String fileName, int grabSize, IdType idType, long highestIdInUse, boolean startup );
-    
-    void create( String fileName );
-    
+    IdGenerator open( FileSystemAbstraction fs, String fileName, int grabSize, IdType idType, long highestIdInUse, boolean startup );
+
+    void create( FileSystemAbstraction fs, String fileName );
+
     IdGenerator get( IdType idType );
-    
-    void updateIdGenerators( NeoStore store );
 }

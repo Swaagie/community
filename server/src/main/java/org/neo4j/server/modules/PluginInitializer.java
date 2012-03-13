@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,7 +24,7 @@ import java.util.HashSet;
 
 import org.apache.commons.configuration.Configuration;
 import org.neo4j.helpers.Service;
-import org.neo4j.kernel.AbstractGraphDatabase;
+import org.neo4j.kernel.GraphDatabaseSPI;
 import org.neo4j.server.NeoServer;
 import org.neo4j.server.plugins.Injectable;
 import org.neo4j.server.plugins.PluginLifecycle;
@@ -46,7 +46,7 @@ public class PluginInitializer
 
     public Collection<Injectable<?>> initializePackages( Iterable<String> packageNames )
     {
-        AbstractGraphDatabase graphDatabaseService = neoServer.getDatabase().graph;
+        GraphDatabaseSPI graphDatabaseService = neoServer.getDatabase().graph;
         Configuration configuration = neoServer.getConfiguration();
 
         Collection<Injectable<?>> injectables = new HashSet<Injectable<?>>();

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,12 +19,14 @@
  */
 package org.neo4j.kernel.impl.event;
 
+import javax.transaction.RollbackException;
+import javax.transaction.SystemException;
+import javax.transaction.Transaction;
 import javax.transaction.xa.XAException;
 import javax.transaction.xa.XAResource;
 import javax.transaction.xa.Xid;
 
 import org.neo4j.helpers.UTF8;
-import org.neo4j.helpers.collection.MapUtil;
 import org.neo4j.kernel.impl.transaction.XidImpl;
 import org.neo4j.kernel.impl.transaction.xaframework.XaConnection;
 import org.neo4j.kernel.impl.transaction.xaframework.XaDataSource;
@@ -32,9 +34,9 @@ import org.neo4j.kernel.impl.transaction.xaframework.XaResource;
 
 public class IllBehavingXaDataSource extends XaDataSource
 {
-    IllBehavingXaDataSource() throws InstantiationException
+    IllBehavingXaDataSource(byte[] branchId, String name) throws InstantiationException
     {
-        super( MapUtil.stringMap( "store_dir", "target/var" ) );
+        super( branchId, name );
     }
     
     @Override
@@ -50,6 +52,8 @@ public class IllBehavingXaDataSource extends XaDataSource
 
     private static class IllBehavingXaConnection implements XaConnection
     {
+        IllBehavingXaResource illBehavingXaResource = new IllBehavingXaResource();
+
         public void destroy()
         {
             // TODO Auto-generated method stub
@@ -58,7 +62,21 @@ public class IllBehavingXaDataSource extends XaDataSource
 
         public XAResource getXaResource()
         {
-            return new IllBehavingXaResource();
+            return illBehavingXaResource;
+        }
+
+        @Override
+        public boolean enlistResource( Transaction javaxTx )
+            throws SystemException, RollbackException
+        {
+            return javaxTx.enlistResource( new IllBehavingXaResource() );
+        }
+
+        @Override
+        public boolean delistResource( Transaction tx, int tmsuccess )
+            throws IllegalStateException, SystemException
+        {
+            return tx.delistResource( illBehavingXaResource, tmsuccess );
         }
     }
     

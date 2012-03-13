@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -79,7 +79,7 @@ abstract class DocumentingTestBase extends JUnitSuite {
 
   private def emitGraphviz(fileName: String): String = {
     val out = new ByteArrayOutputStream();
-    val writer = new GraphvizWriter(new AsciiDocStyle());
+    val writer = new GraphvizWriter(AsciiDocStyle.withAutomaticRelationshipTypeColors());
     writer.emit(out, Walker.fullGraph(db));
 
     """

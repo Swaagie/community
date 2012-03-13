@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -341,6 +341,13 @@ public class TestApps extends AbstractShellTest
         executeCommand( "ls", "name", "test", "-", "KNOWS" );
     }
     
+    @Test
+    public void getDbinfo() throws Exception
+    {
+        // It's JSON coming back from dbinfo command
+        executeCommand( "dbinfo -g Kernel", "\\{", "\\}", "StoreId" );
+    }
+    
     @Ignore( "Setting a new reference node isn't persistent" )
     @Test
     public void setNewReferenceNode() throws Exception
@@ -350,5 +357,21 @@ public class TestApps extends AbstractShellTest
         executeCommand( "mknode -r --cd --np \"{'name':'test'}\"" );
         executeCommand( "cd" );
         executeCommand( "ls -p", "name", "test" );
+    }
+    
+    @Test
+    public void evalOneLinerExecutesImmediately() throws Exception
+    {
+        executeCommand( "eval db.createNode()", "Node\\[" );
+    }
+    
+    @Test
+    public void evalMultiLineExecutesAfterAllLines() throws Exception
+    {
+        executeCommand(
+                "eval\n" +
+                "node = db.createNode()\n" +
+                "node.setProperty( \"name\", \"Mattias\" )\n" +
+                "node.getProperty( \"name\" )\n", "Mattias" );
     }
 }

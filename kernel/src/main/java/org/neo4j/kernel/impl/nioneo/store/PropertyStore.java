@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,10 +19,6 @@
  */
 package org.neo4j.kernel.impl.nioneo.store;
 
-import static org.neo4j.kernel.Config.ARRAY_BLOCK_SIZE;
-import static org.neo4j.kernel.Config.STRING_BLOCK_SIZE;
-
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -30,7 +26,6 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Level;
 
 import org.neo4j.helpers.UTF8;
 import org.neo4j.kernel.IdGeneratorFactory;
@@ -43,6 +38,12 @@ import org.neo4j.kernel.impl.util.StringLogger;
  */
 public class PropertyStore extends AbstractStore implements Store, RecordStore<PropertyRecord>
 {
+    public interface Configuration
+        extends AbstractStore.Configuration
+    {
+        
+    }
+    
     public static final int DEFAULT_DATA_BLOCK_SIZE = 120;
     public static final int DEFAULT_PAYLOAD_SIZE = 32;
 
@@ -58,9 +59,14 @@ public class PropertyStore extends AbstractStore implements Store, RecordStore<P
     private PropertyIndexStore propertyIndexStore;
     private DynamicArrayStore arrayPropertyStore;
 
-    public PropertyStore( String fileName, Map<?,?> config )
+    public PropertyStore(String fileName, Configuration configuration, IdGeneratorFactory idGeneratorFactory, FileSystemAbstraction fileSystemAbstraction, StringLogger stringLogger,
+                         DynamicStringStore stringPropertyStore, PropertyIndexStore propertyIndexStore, DynamicArrayStore arrayPropertyStore)
     {
-        super( fileName, config, IdType.PROPERTY );
+        super( fileName, configuration, IdType.PROPERTY, idGeneratorFactory, fileSystemAbstraction, stringLogger );
+        this.stringPropertyStore = stringPropertyStore;
+        this.propertyIndexStore = propertyIndexStore;
+        this.arrayPropertyStore = arrayPropertyStore;
+
     }
 
     @Override
@@ -77,17 +83,6 @@ public class PropertyStore extends AbstractStore implements Store, RecordStore<P
     DynamicArrayStore getArrayStore()
     {
         return arrayPropertyStore;
-    }
-
-    @Override
-    protected void initStorage()
-    {
-        stringPropertyStore = new DynamicStringStore( getStorageFileName()
-            + ".strings", getConfig(), IdType.STRING_BLOCK );
-        propertyIndexStore = new PropertyIndexStore( getStorageFileName()
-            + ".index", getConfig() );
-        arrayPropertyStore = new DynamicArrayStore( getStorageFileName()
-            + ".arrays", getConfig(), IdType.ARRAY_BLOCK );
     }
 
     @Override
@@ -153,59 +148,6 @@ public class PropertyStore extends AbstractStore implements Store, RecordStore<P
     public int getRecordHeaderSize()
     {
         return RECORD_SIZE - DEFAULT_PAYLOAD_SIZE;
-    }
-
-    /**
-     * Creates a new property store contained in <CODE>fileName</CODE> If
-     * filename is <CODE>null</CODE> or the file already exists an
-     * <CODE>IOException</CODE> is thrown.
-     *
-     * @param fileName
-     *            File name of the new property store
-     * @throws IOException
-     *             If unable to create property store or name null
-     */
-    public static void createStore( String fileName, Map<?,?> config )
-    {
-        IdGeneratorFactory idGeneratorFactory = (IdGeneratorFactory) config.get(
-                IdGeneratorFactory.class );
-        FileSystemAbstraction fileSystem = (FileSystemAbstraction) config.get( FileSystemAbstraction.class );
-
-        createEmptyStore( fileName, buildTypeDescriptorAndVersion( TYPE_DESCRIPTOR ), idGeneratorFactory,
-                fileSystem );
-        int stringStoreBlockSize = DEFAULT_DATA_BLOCK_SIZE;
-        int arrayStoreBlockSize = DEFAULT_DATA_BLOCK_SIZE;
-        try
-        {
-            String stringBlockSize = (String) config.get( STRING_BLOCK_SIZE );
-            String arrayBlockSize = (String) config.get( ARRAY_BLOCK_SIZE );
-            if ( stringBlockSize != null )
-            {
-                int value = Integer.parseInt( stringBlockSize );
-                if ( value > 0 )
-                {
-                    stringStoreBlockSize = value;
-                }
-            }
-            if ( arrayBlockSize != null )
-            {
-                int value = Integer.parseInt( arrayBlockSize );
-                if ( value > 0 )
-                {
-                    arrayStoreBlockSize = value;
-                }
-            }
-        }
-        catch ( Exception e )
-        {
-            logger.log( Level.WARNING, "Exception creating store", e );
-        }
-
-        DynamicStringStore.createStore( fileName + ".strings",
-            stringStoreBlockSize, idGeneratorFactory, fileSystem, IdType.STRING_BLOCK );
-        PropertyIndexStore.createStore( fileName + ".index", idGeneratorFactory, fileSystem );
-        DynamicArrayStore.createStore( fileName + ".arrays",
-                arrayStoreBlockSize, idGeneratorFactory, fileSystem );
     }
 
     private long nextStringBlockId()
@@ -289,10 +231,8 @@ public class PropertyStore extends AbstractStore implements Store, RecordStore<P
 
             // Then go through the blocks
             int longsAppended = 0; // For marking the end of blocks
-            List<PropertyBlock> blocks = record.getPropertyBlocks();
-            for ( int i = 0; i < blocks.size(); i++ )
+            for ( PropertyBlock block : record.getPropertyBlocks() )
             {
-                PropertyBlock block = blocks.get( i );
                 long[] propBlockValues = block.getValueBlocks();
                 for ( int k = 0; k < propBlockValues.length; k++ )
                 {
@@ -332,9 +272,8 @@ public class PropertyStore extends AbstractStore implements Store, RecordStore<P
 
     private void updateDynamicRecords( List<DynamicRecord> records )
     {
-        for (int i = 0; i < records.size(); i++)
+        for (DynamicRecord valueRecord : records)
         {
-            DynamicRecord valueRecord = records.get( i );
             if ( valueRecord.getType() == PropertyType.STRING.intValue() )
             {
                 stringPropertyStore.updateRecord( valueRecord );
@@ -441,7 +380,7 @@ public class PropertyStore extends AbstractStore implements Store, RecordStore<P
         {
             return new PropertyRecord( id );
         }
-        
+
         try
         {
             return getRecord( id, window, RecordLoad.FORCE );
@@ -451,7 +390,7 @@ public class PropertyStore extends AbstractStore implements Store, RecordStore<P
             releaseWindow( window );
         }
     }
-    
+
     @Override
     public PropertyRecord forceGetRaw( long id )
     {
@@ -497,7 +436,7 @@ public class PropertyStore extends AbstractStore implements Store, RecordStore<P
         PropertyRecord toReturn = getRecordFromBuffer( id, buffer );
         if ( !toReturn.inUse() && load != RecordLoad.FORCE )
         {
-            throw new InvalidRecordException( "Record[" + id + "] not in use" );
+            throw new InvalidRecordException( "PropertyRecord[" + id + "] not in use" );
         }
         return toReturn;
     }
@@ -508,7 +447,7 @@ public class PropertyStore extends AbstractStore implements Store, RecordStore<P
      * result is returned, that has inUse() return false. Also, the argument is not
      * touched.
      */
-    private static PropertyBlock getPropertyBlock( Buffer buffer )
+    private PropertyBlock getPropertyBlock( Buffer buffer )
     {
 
         long header = buffer.getLong();
@@ -694,13 +633,6 @@ public class PropertyStore extends AbstractStore implements Store, RecordStore<P
             {
                 store.makeHeavy( record );
             }
-            assert record.getData().length > 0;
-            // assert ( ( record.getData().length == ( DEFAULT_DATA_BLOCK_SIZE -
-            // AbstractDynamicStore.BLOCK_HEADER_SIZE ) ) && (
-            // record.getNextBlock() != Record.NO_NEXT_BLOCK.intValue() ) )
-            // || ( ( record.getData().length < ( DEFAULT_DATA_BLOCK_SIZE -
-            // AbstractDynamicStore.BLOCK_HEADER_SIZE ) ) && (
-            // record.getNextBlock() == Record.NO_NEXT_BLOCK.intValue() ) );
             ByteBuffer buf = ByteBuffer.wrap( record.getData() );
             byte[] bytes = new byte[record.getData().length];
             totalSize += bytes.length;
@@ -716,7 +648,6 @@ public class PropertyStore extends AbstractStore implements Store, RecordStore<P
                 currentArray.length );
             offset += currentArray.length;
         }
-        assert bArray.length > 0;
         return bArray;
     }
 
@@ -745,27 +676,28 @@ public class PropertyStore extends AbstractStore implements Store, RecordStore<P
     {
         // TODO: The next line is an ugly hack, but works.
         Buffer fromByteBuffer = new Buffer( null, buffer );
-        return getRecordFromBuffer( 0, fromByteBuffer ).inUse();
+        return buffer.limit() >= RECORD_SIZE
+               && getRecordFromBuffer( 0, fromByteBuffer ).inUse();
     }
 
     @Override
-    public void logVersions( StringLogger.LineLogger msgLog )
+    public void logVersions(StringLogger.LineLogger logger )
     {
-        super.logVersions( msgLog );
-        propertyIndexStore.logVersions( msgLog );
-        stringPropertyStore.logVersions( msgLog );
-        arrayPropertyStore.logVersions( msgLog );
+        super.logVersions( logger );
+        propertyIndexStore.logVersions( logger );
+        stringPropertyStore.logVersions( logger );
+        arrayPropertyStore.logVersions(logger  );
     }
 
     @Override
-    public void logIdUsage( StringLogger.LineLogger logger )
+    public void logIdUsage(StringLogger.LineLogger logger )
     {
-        NeoStore.logIdUsage( logger, this );
+        super.logIdUsage(logger);
         propertyIndexStore.logIdUsage( logger );
         stringPropertyStore.logIdUsage( logger );
         arrayPropertyStore.logIdUsage( logger );
     }
-    
+
     @Override
     public String toString()
     {

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2002-2011 "Neo Technology,"
+ * Copyright (c) 2002-2012 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -37,7 +37,7 @@ public class UdcTimerTask extends TimerTask
     private final String storeId;
     private final Pinger pinger;
 
-    public UdcTimerTask( String host, String version, String storeId, String source, boolean crashPing )
+    public UdcTimerTask(String host, String version, String storeId, String source, boolean crashPing, String registration, String mac)
     {
         successCounts.put( storeId, 0 );
         failureCounts.put( storeId, 0 );
@@ -53,7 +53,14 @@ public class UdcTimerTask extends TimerTask
         {
             params.put( "source", source );
         }
-
+        if ( registration != null )
+        {
+            params.put( "reg", registration );
+        }
+        if (mac != null) 
+        {
+            params.put( "mac", mac );
+        }
 
         pinger = new Pinger( host, params, crashPing );
     }
