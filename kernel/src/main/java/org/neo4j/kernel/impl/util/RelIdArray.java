@@ -22,7 +22,10 @@ package org.neo4j.kernel.impl.util;
 import java.util.Collection;
 import java.util.NoSuchElementException;
 
-public class RelIdArray
+import org.neo4j.kernel.impl.cache.SizeOf;
+import org.neo4j.kernel.impl.cache.SizeOfs;
+
+public class RelIdArray implements SizeOf
 {
     public static class EmptyRelIdArray extends RelIdArray
     {
@@ -78,6 +81,21 @@ public class RelIdArray
         this.type = type;
     }
     
+    public int size()
+    {
+        // Object + type(String) + lastOutBlock(Object) + lastInBlock(Object)
+        return 16 + SizeOfs.sizeOf( type ) + sizeOfBlock(lastOutBlock) + sizeOfBlock(lastInBlock); 
+    }
+    
+    static int sizeOfBlock( IdBlock block )
+    {
+        if ( block != null )
+        {
+            return 8 + block.size();
+        }
+        return 8;
+    }
+
     public String getType()
     {
         return type;
@@ -262,7 +280,7 @@ public class RelIdArray
     
     public static final IdBlock EMPTY_BLOCK = new LowIdBlock();
     
-    public static abstract class IdBlock
+    public static abstract class IdBlock implements SizeOf
     {
         // First element is the actual length w/o the slack
         private int[] ids = new int[3];
@@ -278,6 +296,12 @@ public class RelIdArray
             copy.ids = new int[length+1];
             System.arraycopy( ids, 0, copy.ids, 0, length+1 );
             return copy;
+        }
+        
+        public int size()
+        {
+            // ids(int[])
+            return 24 + 4*ids.length;
         }
         
         /**
@@ -361,6 +385,13 @@ public class RelIdArray
     
     private static class LowIdBlock extends IdBlock
     {
+        
+        public int size()
+        {
+            // Object + super
+            return 16 + super.size();
+        }
+        
         @Override
         void setPrev( IdBlock prev )
         {
@@ -402,6 +433,17 @@ public class RelIdArray
         HighIdBlock( long highBits )
         {
             this.highBits = highBits;
+        }
+        
+        public int size()
+        {
+            // Objet + highBits(long) + prev(IdBlock) + super;
+            int size = 16 + 8;
+            if ( prev != null )
+            {
+                size += prev.size();
+            }
+            return size + super.size();
         }
         
         @Override

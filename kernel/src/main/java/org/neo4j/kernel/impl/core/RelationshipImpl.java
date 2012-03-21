@@ -232,4 +232,10 @@ public class RelationshipImpl extends ArrayBasedPrimitive
     {
         return nm.newRelationshipProxyById( getId() );
     }
+
+    @Override
+    protected void updateSize( int sizeBefore, int sizeAfter, NodeManager nodeManager )
+    {
+        nodeManager.updateCacheSize( this, sizeBefore, sizeAfter );
+    }
 }
